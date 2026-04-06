@@ -12,3 +12,4 @@ export * from "./rolebackups";
 export * from "./modmailsessions";
 export * from "./reminders";
 export * from "./xp";
+export * from "./counting";

@@ -268,6 +268,10 @@ export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
     levelUpChannelId: "",
     voiceLogChannelId: "",
     joinLogChannelId: "",
+    antiNukeEnabled: true,
+    antiNukeThreshold: 3,
+    antiNukeWindowSecs: 10,
+    altLogChannelId: "",
   };
 
   await db.insert(guildConfigTable).values(defaults).onConflictDoNothing();

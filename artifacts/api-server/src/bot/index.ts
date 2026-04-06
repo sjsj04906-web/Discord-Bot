@@ -14,6 +14,8 @@ import { handleVoiceStateUpdate } from "./events/voiceLog.js";
 import { handleMemberJoinLog, handleMemberLeaveLog } from "./events/joinLeaveLog.js";
 import { startReminderScheduler } from "./reminderScheduler.js";
 import { handleXp } from "./events/xpHandler.js";
+import { handleCounting } from "./events/counting.js";
+import { handleAntiNukeRoleDelete, handleAntiNukeChannelDelete, handleAntiNukeBanAdd } from "./events/antiNuke.js";
 import { handleWelcome } from "./events/welcome.js";
 import { handleReactionAdd, handleReactionRemove } from "./events/reactionRoles.js";
 import { initInviteTracker, handleInviteCreate, handleInviteDelete, handleInviteJoin } from "./events/inviteTracker.js";
@@ -359,6 +361,7 @@ export function startBot(): void {
     await handleAutoMod(message);
     await handleHarassmentDetection(message);
     await handleXp(message);
+    await handleCounting(message);
   });
 
   client.on(Events.MessageDelete, async (message) => {
@@ -421,6 +424,7 @@ export function startBot(): void {
   client.on(Events.ChannelDelete, async (channel) => {
     if (channel.isDMBased()) return;
     await handleChannelDelete(channel as import("discord.js").GuildChannel);
+    await handleAntiNukeChannelDelete(channel as import("discord.js").GuildChannel);
   });
 
   client.on(Events.ChannelUpdate, async (oldChannel, newChannel) => {
@@ -437,6 +441,11 @@ export function startBot(): void {
 
   client.on(Events.GuildRoleDelete, async (role) => {
     await handleRoleDelete(role);
+    await handleAntiNukeRoleDelete(role);
+  });
+
+  client.on(Events.GuildBanAdd, async (ban) => {
+    await handleAntiNukeBanAdd(ban.guild);
   });
 
   client.on(Events.GuildRoleUpdate, async (oldRole, newRole) => {

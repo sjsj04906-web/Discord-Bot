@@ -52,6 +52,7 @@ import * as remind from "./remind.js";
 import * as rank from "./rank.js";
 import * as leaderboard from "./leaderboard.js";
 import * as leveling from "./leveling.js";
+import * as counting from "./counting.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -75,4 +76,5 @@ export const allCommands: SlashCommand[] = [
   rank,
   leaderboard,
   leveling,
+  counting,
 ];

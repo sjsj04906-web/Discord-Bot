@@ -14,21 +14,39 @@ export async function handleNewAccount(member: GuildMember): Promise<void> {
   const accountAgeDays = (Date.now() - member.user.createdTimestamp) / 86_400_000;
   if (accountAgeDays >= config.newAccountDays) return;
 
-  const channel = member.guild.channels.cache.find(
-    (c) => MOD_CHANNEL_NAMES.includes(c.name.toLowerCase()) && c.isTextBased()
+  const accountAgeHours = Math.floor(accountAgeDays * 24);
+  const isVeryNew = accountAgeDays < 1; // under 24 hours — higher risk
+
+  // Use dedicated alt-log channel, fall back to admin log, then mod-log channels
+  const channel = (
+    (config.altLogChannelId
+      ? member.guild.channels.cache.get(config.altLogChannelId)
+      : null) ??
+    (config.adminLogChannelId
+      ? member.guild.channels.cache.get(config.adminLogChannelId)
+      : null) ??
+    member.guild.channels.cache.find(
+      (c) => MOD_CHANNEL_NAMES.includes(c.name.toLowerCase()) && c.isTextBased()
+    )
   ) as TextChannel | undefined;
 
   if (!channel) return;
 
   const embed = new EmbedBuilder()
-    .setColor(THEME.warn)
-    .setTitle("🆕 // SUSPICIOUS NEW ACCOUNT")
+    .setColor(isVeryNew ? THEME.danger : THEME.warn)
+    .setAuthor({ name: `${isVeryNew ? "🚨" : "⚠️"}  Suspicious New Account  ·  ${BOT_NAME}` })
     .setThumbnail(member.user.displayAvatarURL())
-    .setDescription(`${member} joined with a **${Math.floor(accountAgeDays * 24)} hour old** account.`)
+    .setDescription(
+      isVeryNew
+        ? `**${member.user.tag}** joined with an account less than **24 hours old**. Possible alt or throwaway.`
+        : `**${member.user.tag}** joined with a young account (${accountAgeHours}h old).`
+    )
     .addFields(
-      { name: "USER",         value: `${member.user} \`${member.user.tag}\``, inline: true },
-      { name: "ACCOUNT AGE",  value: `${Math.floor(accountAgeDays * 24)}h`, inline: true },
-      { name: "THRESHOLD",    value: `${config.newAccountDays} days`, inline: true },
+      { name: "USER",         value: `${member.user} \`${member.user.tag}\``,        inline: true },
+      { name: "ACCOUNT AGE",  value: `${accountAgeHours}h (${accountAgeDays.toFixed(1)} days)`, inline: true },
+      { name: "THRESHOLD",    value: `${config.newAccountDays} days`,                inline: true },
+      { name: "ACCOUNT CREATED", value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true },
+      { name: "JOINED AT",    value: `<t:${Math.floor(Date.now() / 1000)}:R>`,       inline: true },
     )
     .setFooter({ text: `User ID: ${member.user.id}` })
     .setTimestamp();

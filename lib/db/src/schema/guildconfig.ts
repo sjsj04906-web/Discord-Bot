@@ -34,6 +34,10 @@ export const guildConfigTable = pgTable("guild_config", {
   joinLogChannelId:       text("join_log_channel_id").default("").notNull(),
   levelingEnabled:        boolean("leveling_enabled").default(true).notNull(),
   levelUpChannelId:       text("level_up_channel_id").default("").notNull(),
+  antiNukeEnabled:        boolean("anti_nuke_enabled").default(true).notNull(),
+  antiNukeThreshold:      integer("anti_nuke_threshold").default(3).notNull(),
+  antiNukeWindowSecs:     integer("anti_nuke_window_secs").default(10).notNull(),
+  altLogChannelId:        text("alt_log_channel_id").default("").notNull(),
 });
 
 export const insertGuildConfigSchema = createInsertSchema(guildConfigTable);
