@@ -8,6 +8,7 @@ import { log } from "./display.js";
 import { addWarning, countWarnings, getGuildConfig, getExemptChannelIds, getWordFilter } from "./db.js";
 import { sendModLog } from "./modlog.js";
 import { THEME, BOT_NAME } from "./theme.js";
+import { randomWarnLine } from "./utils/savagelines.js";
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const spamTracker     = new Map<string, { count: number; lastMessage: number }>();
@@ -126,6 +127,7 @@ async function checkEscalation(message: Message, warningCount: number): Promise<
         .setColor(THEME.warn)
         .setTitle(`⚠️ ${BOT_NAME} // FORMAL WARNING`)
         .setDescription(
+          `*${randomWarnLine()}*\n\n` +
           `You have received a **formal automated warning** in **${message.guild.name}**.\n\n` +
           `Your account has accumulated **${warningCount} automod violations**. ` +
           `Continued rule violations will result in a **mute** and eventually a **ban**.\n\n` +
