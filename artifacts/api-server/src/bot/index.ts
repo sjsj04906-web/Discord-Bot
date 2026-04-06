@@ -2,7 +2,12 @@ import { Events, type Interaction } from "discord.js";
 import { client, commands } from "./client.js";
 import { allCommands } from "./commands/index.js";
 import { handleAutoMod } from "./automod.js";
+import { handleMessageDelete, handleMessageUpdate } from "./events/messageLog.js";
+import { handleAntiRaid } from "./events/antiRaid.js";
+import { handleNewAccount } from "./events/memberJoin.js";
 import { printBanner, log } from "./display.js";
+import { startStatusRotation } from "./statusRotation.js";
+import { restorePendingTempBans } from "./tempbanScheduler.js";
 import { logger } from "../lib/logger.js";
 
 export function startBot(): void {
@@ -22,15 +27,13 @@ export function startBot(): void {
     try {
       const commandData = allCommands.map((c) => c.data.toJSON());
       await readyClient.application.commands.set(commandData);
-      printBanner(
-        readyClient.user.tag,
-        readyClient.guilds.cache.size,
-        totalMembers,
-        commandData.length,
-      );
+      printBanner(readyClient.user.tag, readyClient.guilds.cache.size, totalMembers, commandData.length);
     } catch (err) {
       logger.error({ err }, "Failed to register slash commands");
     }
+
+    startStatusRotation(readyClient);
+    await restorePendingTempBans(readyClient);
   });
 
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
@@ -58,8 +61,18 @@ export function startBot(): void {
     await handleAutoMod(message);
   });
 
-  client.on(Events.GuildMemberAdd, (member) => {
+  client.on(Events.MessageDelete, async (message) => {
+    await handleMessageDelete(message);
+  });
+
+  client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
+    await handleMessageUpdate(oldMessage, newMessage);
+  });
+
+  client.on(Events.GuildMemberAdd, async (member) => {
     log.join(member.user.tag, member.guild.name);
+    await handleAntiRaid(member);
+    await handleNewAccount(member);
   });
 
   client.on(Events.Error, (err) => {

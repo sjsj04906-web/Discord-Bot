@@ -1,6 +1,7 @@
 import type {
   ChatInputCommandInteraction,
   SlashCommandOptionsOnlyBuilder,
+  SlashCommandSubcommandsOnlyBuilder,
 } from "discord.js";
 import * as ban from "./ban.js";
 import * as unban from "./unban.js";
@@ -15,24 +16,22 @@ import * as lock from "./lock.js";
 import * as unlock from "./unlock.js";
 import * as userinfo from "./userinfo.js";
 import * as serverinfo from "./serverinfo.js";
+import * as tempban from "./tempban.js";
+import * as note from "./note.js";
+import * as poll from "./poll.js";
+import * as role from "./role.js";
+import * as automodconfig from "./automodconfig.js";
 
 export interface SlashCommand {
-  data: SlashCommandOptionsOnlyBuilder;
+  data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
   execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
 }
 
 export const allCommands: SlashCommand[] = [
-  ban,
-  unban,
-  kick,
-  mute,
-  unmute,
-  warn,
-  warningsCmd,
-  clear,
-  slowmode,
-  lock,
-  unlock,
-  userinfo,
-  serverinfo,
+  ban, unban, kick, mute, unmute,
+  warn, warningsCmd, clear,
+  slowmode, lock, unlock,
+  userinfo, serverinfo,
+  tempban, note, poll, role,
+  automodconfig,
 ];
