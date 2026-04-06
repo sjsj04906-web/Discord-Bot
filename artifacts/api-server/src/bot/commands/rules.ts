@@ -56,7 +56,7 @@ const RULES = [
 ];
 
 // ── Embed ─────────────────────────────────────────────────────────────────────
-function buildRulesEmbed(guildName: string, guildIcon: string | null, withGate: boolean): EmbedBuilder {
+function buildRulesEmbed(guildName: string, guildIcon: string | null): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(0x00C4CC)
     .setAuthor({ name: `📜  Server Rules  ·  ${BOT_NAME}` })
@@ -69,9 +69,7 @@ function buildRulesEmbed(guildName: string, guildIcon: string | null, withGate: 
     .addFields(...RULES.map((r) => ({ name: r.title, value: r.body, inline: false })))
     .addFields({
       name:  "\u200b",
-      value: withGate
-        ? `React with ${GATE_EMOJI} below to accept these rules and gain access to the server.`
-        : "If you have questions or need to report an issue, use **/modmail** or reach out to a staff member directly.",
+      value: `React with ${GATE_EMOJI} below to acknowledge these rules.`,
     })
     .setFooter({ text: `${BOT_NAME}  ·  Last updated` })
     .setTimestamp();
@@ -105,11 +103,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const rulesChannel = interaction.channel as TextChannel;
-  const embed        = buildRulesEmbed(interaction.guild.name, interaction.guild.iconURL(), !!gateRole);
+  const embed        = buildRulesEmbed(interaction.guild.name, interaction.guild.iconURL());
   const rulesMsg     = await rulesChannel.send({ embeds: [embed] });
 
+  // Always add the ✅ reaction so members know to acknowledge
+  await rulesMsg.react(GATE_EMOJI).catch(() => {});
+
   if (gateRole) {
-    await rulesMsg.react(GATE_EMOJI).catch(() => {});
     await addReactionRole(
       interaction.guild.id,
       rulesMsg.id,
