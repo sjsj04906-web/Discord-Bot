@@ -91,6 +91,13 @@ export function startBot(): void {
     }
   });
 
+  // Raw WS listener — catches events before discord.js processes them
+  client.on("raw" as never, (packet: { t: string; d: Record<string, unknown> }) => {
+    if (packet.t === "MESSAGE_CREATE" && !packet.d["guild_id"]) {
+      console.log(`[raw-dm] DM packet received — channel=${packet.d["channel_id"]} author=${(packet.d["author"] as Record<string, unknown> | undefined)?.["username"]}`);
+    }
+  });
+
   client.on(Events.MessageCreate, async (message) => {
     // Debug: log every single message so we can confirm DMs are received
     console.log(`[msg] guildId=${message.guildId ?? "null"} channelType=${message.channel?.type ?? "?"} partial=${message.partial} author=${message.author?.tag ?? "?"}`);
