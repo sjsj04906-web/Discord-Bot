@@ -1,7 +1,8 @@
-import { EmbedBuilder, type TextChannel, type DMChannel, type NewsChannel, type ThreadChannel } from "discord.js";
+import { EmbedBuilder, type Client, type TextChannel, type DMChannel, type NewsChannel, type ThreadChannel } from "discord.js";
 import type { EconomyUser } from "@workspace/db";
-import { getBalance, getUnlockedAchievements, unlockAchievement, addBalance } from "../db.js";
+import { getBalance, getUnlockedAchievements, unlockAchievement, addBalance, getAllEconomyRows } from "../db.js";
 import { THEME, BOT_NAME } from "../theme.js";
+import { logger } from "../../lib/logger.js";
 
 export interface AchievementDef {
   id:     string;
@@ -41,6 +42,57 @@ export const ACHIEVEMENTS: AchievementDef[] = [
 ];
 
 type SendableChannel = TextChannel | DMChannel | NewsChannel | ThreadChannel;
+
+export async function runRetroactiveCheck(client: Client, currencyEmoji = "🪙"): Promise<void> {
+  logger.info("Running retroactive achievement check…");
+  let awarded = 0;
+  let users   = 0;
+
+  try {
+    const rows = await getAllEconomyRows();
+
+    for (const eco of rows) {
+      const unlocked    = await getUnlockedAchievements(eco.guildId, eco.userId);
+      const unlockedIds = new Set(unlocked.map((u) => u.achievementId));
+      const newlyEarned: AchievementDef[] = [];
+
+      for (const ach of ACHIEVEMENTS) {
+        if (unlockedIds.has(ach.id)) continue;
+        if (!ach.check(eco)) continue;
+
+        await unlockAchievement(eco.guildId, eco.userId, ach.id);
+        if (ach.reward > 0) await addBalance(eco.guildId, eco.userId, ach.reward);
+        newlyEarned.push(ach);
+        awarded++;
+      }
+
+      if (newlyEarned.length === 0) continue;
+      users++;
+
+      const totalReward = newlyEarned.reduce((s, a) => s + a.reward, 0);
+      const lines       = newlyEarned.map((a) => `${a.emoji} **${a.name}** — ${a.desc}  (+${a.reward.toLocaleString()} ${currencyEmoji})`).join("\n");
+
+      try {
+        const dmUser = await client.users.fetch(eco.userId).catch(() => null);
+        if (dmUser) {
+          const embed = new EmbedBuilder()
+            .setColor(THEME.success)
+            .setAuthor({ name: `🏅  Retroactive Achievements Unlocked!  ·  ${BOT_NAME}` })
+            .setDescription(`You qualified for these achievements before the system launched:\n\n${lines}`)
+            .addFields({ name: "Total Bonus", value: `+${totalReward.toLocaleString()} ${currencyEmoji}`, inline: true })
+            .setFooter({ text: "Coins have been added to your wallet" })
+            .setTimestamp();
+
+          await dmUser.send({ embeds: [embed] }).catch(() => {});
+        }
+      } catch {}
+    }
+  } catch (err) {
+    logger.error({ err }, "Retroactive achievement check failed");
+  }
+
+  logger.info({ awarded, users }, "Retroactive achievement check complete");
+}
 
 export async function checkAndAward(
   guildId:       string,

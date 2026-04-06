@@ -802,6 +802,10 @@ export async function withdrawFromBank(
   return rows[0] ?? { wallet: 0, bank: 0 };
 }
 
+export async function getAllEconomyRows(): Promise<EconomyUser[]> {
+  return db.select().from(economyTable);
+}
+
 export async function getEconomyLeaderboard(guildId: string, limit = 10, offset = 0): Promise<EconomyUser[]> {
   return db.select().from(economyTable)
     .where(eq(economyTable.guildId, guildId))
