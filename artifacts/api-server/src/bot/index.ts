@@ -23,6 +23,7 @@ import { handleBlackjackButton } from "./commands/gamble.js";
 import { handleHeistJoin } from "./commands/heist.js";
 import { handleDuelButton } from "./commands/duel.js";
 import { handleAutoResponder } from "./events/autoresponder.js";
+import { handlePromptInstall } from "./commands/autoresponder.js";
 import { getSuggestion, updateSuggestionStatus } from "./db.js";
 import { applySuggestionVerdict } from "./commands/suggestion.js";
 import { handleSuggestionMessage, handleSuggestionThread } from "./events/suggestions.js";
@@ -280,6 +281,13 @@ export function startBot(): void {
     if (interaction.isButton() && interaction.customId.startsWith("heist_join_")) {
       const guildId = interaction.customId.replace("heist_join_", "");
       await handleHeistJoin(interaction, guildId);
+      return;
+    }
+
+    // ── Auto-responder prompt install (select menu) ───────────────────────────
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("ar_prompt_install_")) {
+      const guildId = interaction.customId.replace("ar_prompt_install_", "");
+      await handlePromptInstall(interaction, guildId);
       return;
     }
 
