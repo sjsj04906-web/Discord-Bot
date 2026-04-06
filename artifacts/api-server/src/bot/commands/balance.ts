@@ -19,19 +19,22 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const em = config.currencyEmoji;
   const name = config.currencyName;
 
+  const netWorth = eco.balance + eco.bankBalance;
   await interaction.reply({
     embeds: [
       new EmbedBuilder()
         .setColor(0xFFD700)
-        .setAuthor({ name: `${em}  ${target.username}'s Wallet  ·  ${BOT_NAME}` })
+        .setAuthor({ name: `${em}  ${target.username}'s Balance  ·  ${BOT_NAME}` })
         .setThumbnail(target.displayAvatarURL())
         .addFields(
-          { name: "Balance",      value: `**${eco.balance.toLocaleString()}** ${em} ${name}`, inline: true },
-          { name: "Total Earned", value: `${eco.totalEarned.toLocaleString()} ${em}`,         inline: true },
-          { name: "Server Rank",  value: `#${rank}`,                                          inline: true },
+          { name: "👜 Wallet",    value: `**${eco.balance.toLocaleString()}** ${em}`,     inline: true },
+          { name: "🏦 Bank",      value: `**${eco.bankBalance.toLocaleString()}** ${em}`, inline: true },
+          { name: "💰 Net Worth", value: `${netWorth.toLocaleString()} ${em} ${name}`,    inline: true },
+          { name: "Total Earned", value: `${eco.totalEarned.toLocaleString()} ${em}`,     inline: true },
+          { name: "Server Rank",  value: `#${rank}`,                                      inline: true },
           { name: "Daily Streak", value: `🔥 ${eco.dailyStreak} day${eco.dailyStreak !== 1 ? "s" : ""}`, inline: true },
         )
-        .setFooter({ text: `${BOT_NAME}  ·  Economy` })
+        .setFooter({ text: `${BOT_NAME}  ·  Economy  ·  Bank is safe from /rob` })
         .setTimestamp(),
     ],
     flags: target.id !== interaction.user.id ? undefined : MessageFlags.Ephemeral,

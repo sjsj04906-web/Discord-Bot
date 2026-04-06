@@ -753,6 +753,55 @@ export async function updateLastWork(guildId: string, userId: string): Promise<v
     .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
 }
 
+export async function updateLastRob(guildId: string, userId: string): Promise<void> {
+  await ensureEconomyRow(guildId, userId);
+  await db.update(economyTable)
+    .set({ lastRob: new Date() })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
+}
+
+export async function updateLastFish(guildId: string, userId: string): Promise<void> {
+  await ensureEconomyRow(guildId, userId);
+  await db.update(economyTable)
+    .set({ lastFish: new Date() })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
+}
+
+export async function updateLastHourly(guildId: string, userId: string): Promise<void> {
+  await ensureEconomyRow(guildId, userId);
+  await db.update(economyTable)
+    .set({ lastHourly: new Date() })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
+}
+
+export async function depositToBank(
+  guildId: string, userId: string, amount: number,
+): Promise<{ wallet: number; bank: number }> {
+  await ensureEconomyRow(guildId, userId);
+  const rows = await db.update(economyTable)
+    .set({
+      balance:     sql`GREATEST(0, ${economyTable.balance} - ${amount})`,
+      bankBalance: sql`${economyTable.bankBalance} + ${amount}`,
+    })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)))
+    .returning({ wallet: economyTable.balance, bank: economyTable.bankBalance });
+  return rows[0] ?? { wallet: 0, bank: 0 };
+}
+
+export async function withdrawFromBank(
+  guildId: string, userId: string, amount: number,
+): Promise<{ wallet: number; bank: number }> {
+  await ensureEconomyRow(guildId, userId);
+  const rows = await db.update(economyTable)
+    .set({
+      balance:     sql`${economyTable.balance} + ${amount}`,
+      bankBalance: sql`GREATEST(0, ${economyTable.bankBalance} - ${amount})`,
+    })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)))
+    .returning({ wallet: economyTable.balance, bank: economyTable.bankBalance });
+  return rows[0] ?? { wallet: 0, bank: 0 };
+}
+
 export async function getEconomyLeaderboard(guildId: string, limit = 10, offset = 0): Promise<EconomyUser[]> {
   return db.select().from(economyTable)
     .where(eq(economyTable.guildId, guildId))

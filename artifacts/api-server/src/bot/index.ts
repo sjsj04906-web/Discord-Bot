@@ -18,6 +18,7 @@ import { handleCounting } from "./events/counting.js";
 import { handleAntiNukeRoleDelete, handleAntiNukeChannelDelete, handleAntiNukeBanAdd } from "./events/antiNuke.js";
 import { handleWelcome } from "./events/welcome.js";
 import { handleBlackjackButton } from "./commands/gamble.js";
+import { handleHeistJoin } from "./commands/heist.js";
 import { getSuggestion, updateSuggestionStatus } from "./db.js";
 import { applySuggestionVerdict } from "./commands/suggestion.js";
 import { handleSuggestionMessage, handleSuggestionThread } from "./events/suggestions.js";
@@ -266,6 +267,13 @@ export function startBot(): void {
     }
     if (interaction.isButton() && interaction.customId.startsWith("bj_stand_")) {
       await handleBlackjackButton(interaction, "stand");
+      return;
+    }
+
+    // ── Heist join button ─────────────────────────────────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith("heist_join_")) {
+      const guildId = interaction.customId.replace("heist_join_", "");
+      await handleHeistJoin(interaction, guildId);
       return;
     }
 
