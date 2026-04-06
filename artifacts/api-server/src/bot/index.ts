@@ -91,22 +91,29 @@ export function startBot(): void {
     }
   });
 
-  // Raw WS listener — catches events before discord.js processes them
-  client.on("raw" as never, (packet: { t: string; d: Record<string, unknown> }) => {
-    if (packet.t === "MESSAGE_CREATE" && !packet.d["guild_id"]) {
-      console.log(`[raw-dm] DM packet received — channel=${packet.d["channel_id"]} author=${(packet.d["author"] as Record<string, unknown> | undefined)?.["username"]}`);
+  // Raw WS listener — Discord.js drops MessageCreate for uncached DM channels,
+  // so we handle DMs here by fetching the full message directly from the API.
+  client.on("raw" as never, async (packet: { t: string; d: Record<string, unknown> }) => {
+    if (packet.t !== "MESSAGE_CREATE" || packet.d["guild_id"]) return;
+
+    const channelId  = packet.d["channel_id"] as string;
+    const messageId  = packet.d["id"] as string;
+    const authorData = packet.d["author"] as Record<string, unknown> | undefined;
+    console.log(`[raw-dm] DM received — channel=${channelId} author=${authorData?.["username"]}`);
+
+    try {
+      const channel = await client.channels.fetch(channelId);
+      if (!channel || !channel.isTextBased()) return;
+      const message = await (channel as import("discord.js").TextChannel).messages.fetch(messageId);
+      await handleDirectMessage(message);
+    } catch (err) {
+      console.error("[raw-dm] failed to fetch and handle DM:", err);
     }
   });
 
   client.on(Events.MessageCreate, async (message) => {
-    // Debug: log every single message so we can confirm DMs are received
-    console.log(`[msg] guildId=${message.guildId ?? "null"} channelType=${message.channel?.type ?? "?"} partial=${message.partial} author=${message.author?.tag ?? "?"}`);
-
-    // ── Mod mail: DM forwarding ──────────────────────────────────────────────
-    if (!message.guildId) {
-      await handleDirectMessage(message);
-      return;
-    }
+    // DMs are handled via the raw listener above; only process guild messages here
+    if (!message.guildId) return;
 
     // ── Mod mail: mod-channel reply forwarding ───────────────────────────────
     await handleModMailReply(message);
