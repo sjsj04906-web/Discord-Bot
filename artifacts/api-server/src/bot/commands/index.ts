@@ -68,6 +68,7 @@ import * as rob from "./rob.js";
 import * as bank from "./bank.js";
 import * as fish from "./fish.js";
 import * as heist from "./heist.js";
+import * as achievements from "./achievements.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -95,4 +96,5 @@ export const allCommands: SlashCommand[] = [
   suggestions, suggestion,
   balance, daily, hourly, work, pay, shop, richest, economy, gamble,
   rob, bank, fish, heist,
+  achievements,
 ];

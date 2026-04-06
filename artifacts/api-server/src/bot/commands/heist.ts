@@ -4,7 +4,8 @@ import {
   type ChatInputCommandInteraction, type ButtonInteraction,
 } from "discord.js";
 import { THEME, BOT_NAME } from "../theme.js";
-import { getGuildConfig, getBalance, addBalance, deductBalance } from "../db.js";
+import { getGuildConfig, getBalance, addBalance, deductBalance, incrementHeistCount } from "../db.js";
+import { checkAndAward } from "../lib/achievements.js";
 
 const JOIN_WINDOW_MS = 30_000;
 const MIN_BET        = 50;
@@ -139,6 +140,8 @@ export async function handleHeistJoin(interaction: ButtonInteraction, guildId: s
 
   await deductBalance(guildId, interaction.user.id, game.bet);
   game.participants.set(interaction.user.id, interaction.user.tag);
+  await incrementHeistCount(guildId, interaction.user.id);
+  checkAndAward(guildId, interaction.user.id, interaction.channel as never, game.em).catch(() => {});
 
   const embed = buildLobbyEmbed(game, game.endsAt);
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

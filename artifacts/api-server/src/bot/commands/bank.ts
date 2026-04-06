@@ -4,6 +4,7 @@ import {
 } from "discord.js";
 import { THEME, BOT_NAME } from "../theme.js";
 import { getGuildConfig, getBalance, depositToBank, withdrawFromBank } from "../db.js";
+import { checkAndAward } from "../lib/achievements.js";
 
 export const data = new SlashCommandBuilder()
   .setName("bank")
@@ -77,6 +78,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       return;
     }
     const result = await depositToBank(interaction.guild.id, interaction.user.id, amount);
+    checkAndAward(interaction.guild.id, interaction.user.id, interaction.channel as never, em).catch(() => {});
     await interaction.reply({
       embeds: [
         new EmbedBuilder()

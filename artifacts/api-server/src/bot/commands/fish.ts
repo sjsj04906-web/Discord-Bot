@@ -3,7 +3,8 @@ import {
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { THEME, BOT_NAME } from "../theme.js";
-import { getGuildConfig, addBalance } from "../db.js";
+import { getGuildConfig, addBalance, incrementFishCount } from "../db.js";
+import { checkAndAward } from "../lib/achievements.js";
 
 
 const CATCHES = [
@@ -70,7 +71,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const catch_ = pickCatch();
   const earned = Math.floor(Math.random() * (catch_.max - catch_.min + 1)) + catch_.min;
 
+  await incrementFishCount(interaction.guild.id, interaction.user.id);
   const newBal = await addBalance(interaction.guild.id, interaction.user.id, earned);
+  checkAndAward(interaction.guild.id, interaction.user.id, interaction.channel as never, em).catch(() => {});
 
   await interaction.editReply({
     embeds: [

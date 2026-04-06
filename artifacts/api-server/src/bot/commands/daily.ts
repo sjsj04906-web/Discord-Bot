@@ -4,6 +4,7 @@ import {
 } from "discord.js";
 import { THEME, BOT_NAME } from "../theme.js";
 import { getGuildConfig, getBalance, addBalance, updateLastDaily } from "../db.js";
+import { checkAndAward } from "../lib/achievements.js";
 
 const DAILY_MS = 20 * 60 * 60 * 1000;
 const STREAK_RESET_MS = 48 * 60 * 60 * 1000;
@@ -46,6 +47,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   await updateLastDaily(interaction.guild.id, interaction.user.id, streak);
   const newBal = await addBalance(interaction.guild.id, interaction.user.id, total);
+  checkAndAward(interaction.guild.id, interaction.user.id, interaction.channel as never, em).catch(() => {});
 
   const embed = new EmbedBuilder()
     .setColor(0xFFD700)

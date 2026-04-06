@@ -4,7 +4,8 @@ import {
   type ButtonInteraction,
 } from "discord.js";
 import { THEME, BOT_NAME } from "../theme.js";
-import { getGuildConfig, getBalance, addBalance, deductBalance } from "../db.js";
+import { getGuildConfig, getBalance, addBalance, deductBalance, incrementBjWins } from "../db.js";
+import { checkAndAward } from "../lib/achievements.js";
 
 export const data = new SlashCommandBuilder()
   .setName("gamble")
@@ -220,6 +221,8 @@ async function resolveStand(interaction: ButtonInteraction, game: BJGame, isAuto
     status = "win";
     delta  = isNaturalBJ ? game.bet + Math.floor(game.bet * 1.5) : game.bet * 2;
     await addBalance(game.guildId, game.userId, delta);
+    await incrementBjWins(game.guildId, game.userId);
+    checkAndAward(game.guildId, game.userId, interaction.channel as never, game.currencyEmoji).catch(() => {});
   } else if (pv === dv) {
     status = "push";
     delta  = 0;
@@ -404,6 +407,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       bjGames.delete(interaction.user.id);
       const winAmount = Math.floor(bet * 1.5);
       await addBalance(interaction.guild.id, interaction.user.id, bet + winAmount);
+      await incrementBjWins(interaction.guild.id, interaction.user.id);
+      checkAndAward(interaction.guild.id, interaction.user.id, interaction.channel as never, em).catch(() => {});
       await interaction.reply({ embeds: [bjEmbed(game, "win", em)], components: [] });
       return;
     }

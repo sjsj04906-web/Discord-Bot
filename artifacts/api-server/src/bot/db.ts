@@ -1,5 +1,5 @@
-import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable, roleBackupsTable, modMailSessionsTable, remindersTable, xpTable, levelRolesTable, suggestionsTable, economyTable, shopTable } from "@workspace/db";
-import { eq, and, desc, count, sql, inArray, lt, gt, lte, asc } from "drizzle-orm";
+import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable, roleBackupsTable, modMailSessionsTable, remindersTable, xpTable, levelRolesTable, suggestionsTable, economyTable, shopTable, userAchievementsTable } from "@workspace/db";
+import { eq, and, desc, count, sql, inArray, lt, gt, lte, asc, isNull, or } from "drizzle-orm";
 import type { GuildConfig, Suggestion, EconomyUser, ShopItem } from "@workspace/db";
 
 // ─── Warnings ─────────────────────────────────────────────────────────────────
@@ -839,4 +839,92 @@ export async function removeShopItem(id: number, guildId: string): Promise<boole
   if (rows.length === 0) return false;
   await db.delete(shopTable).where(and(eq(shopTable.id, id), eq(shopTable.guildId, guildId)));
   return true;
+}
+
+// ─── Economy counters ─────────────────────────────────────────────────────────
+export async function incrementFishCount(guildId: string, userId: string): Promise<void> {
+  await ensureEconomyRow(guildId, userId);
+  await db.update(economyTable)
+    .set({ fishCount: sql`${economyTable.fishCount} + 1` })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
+}
+
+export async function incrementRobSuccesses(guildId: string, userId: string): Promise<void> {
+  await ensureEconomyRow(guildId, userId);
+  await db.update(economyTable)
+    .set({ robSuccesses: sql`${economyTable.robSuccesses} + 1` })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
+}
+
+export async function incrementBjWins(guildId: string, userId: string): Promise<void> {
+  await ensureEconomyRow(guildId, userId);
+  await db.update(economyTable)
+    .set({ bjWins: sql`${economyTable.bjWins} + 1` })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
+}
+
+export async function incrementHeistCount(guildId: string, userId: string): Promise<void> {
+  await ensureEconomyRow(guildId, userId);
+  await db.update(economyTable)
+    .set({ heistCount: sql`${economyTable.heistCount} + 1` })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
+}
+
+// ─── Achievements ─────────────────────────────────────────────────────────────
+export async function getUnlockedAchievements(guildId: string, userId: string) {
+  return db.select()
+    .from(userAchievementsTable)
+    .where(and(
+      eq(userAchievementsTable.guildId, guildId),
+      eq(userAchievementsTable.userId, userId),
+    ))
+    .orderBy(asc(userAchievementsTable.unlockedAt));
+}
+
+export async function unlockAchievement(
+  guildId: string, userId: string, achievementId: string,
+): Promise<boolean> {
+  try {
+    await db.insert(userAchievementsTable)
+      .values({ guildId, userId, achievementId })
+      .onConflictDoNothing();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Bank interest ────────────────────────────────────────────────────────────
+const INTEREST_RATE      = 0.02;
+const INTEREST_INTERVAL  = 24 * 60 * 60 * 1000;
+const INTEREST_MIN_BAL   = 100;
+const INTEREST_MAX_GRANT = 100_000;
+
+export async function applyBankInterest(): Promise<Array<{ guildId: string; userId: string; grant: number }>> {
+  const cutoff = new Date(Date.now() - INTEREST_INTERVAL);
+  const eligible = await db.select({
+    guildId:     economyTable.guildId,
+    userId:      economyTable.userId,
+    bankBalance: economyTable.bankBalance,
+  })
+    .from(economyTable)
+    .where(and(
+      gt(economyTable.bankBalance, INTEREST_MIN_BAL),
+      or(isNull(economyTable.lastInterest), lt(economyTable.lastInterest, cutoff)),
+    ));
+
+  const results: Array<{ guildId: string; userId: string; grant: number }> = [];
+  for (const row of eligible) {
+    const grant = Math.min(Math.floor(row.bankBalance * INTEREST_RATE), INTEREST_MAX_GRANT);
+    if (grant < 1) continue;
+    await db.update(economyTable)
+      .set({
+        bankBalance:  sql`${economyTable.bankBalance} + ${grant}`,
+        totalEarned:  sql`${economyTable.totalEarned} + ${grant}`,
+        lastInterest: new Date(),
+      })
+      .where(and(eq(economyTable.guildId, row.guildId), eq(economyTable.userId, row.userId)));
+    results.push({ guildId: row.guildId, userId: row.userId, grant });
+  }
+  return results;
 }

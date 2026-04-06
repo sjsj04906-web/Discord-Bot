@@ -13,6 +13,7 @@ import { handleDirectMessage, handleModMailReply, handleModMailButtonInteraction
 import { handleVoiceStateUpdate } from "./events/voiceLog.js";
 import { handleMemberJoinLog, handleMemberLeaveLog } from "./events/joinLeaveLog.js";
 import { startReminderScheduler } from "./reminderScheduler.js";
+import { startInterestScheduler } from "./interestScheduler.js";
 import { handleXp } from "./events/xpHandler.js";
 import { handleCounting } from "./events/counting.js";
 import { handleAntiNukeRoleDelete, handleAntiNukeChannelDelete, handleAntiNukeBanAdd } from "./events/antiNuke.js";
@@ -70,6 +71,7 @@ export function startBot(): void {
     startRetentionScheduler();
     startServerStatsScheduler(readyClient);
     startReminderScheduler(readyClient);
+    startInterestScheduler(readyClient);
     await initInviteTracker(readyClient);
   });
 

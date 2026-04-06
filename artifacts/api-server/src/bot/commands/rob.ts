@@ -3,7 +3,8 @@ import {
   MessageFlags, type ChatInputCommandInteraction,
 } from "discord.js";
 import { THEME, BOT_NAME } from "../theme.js";
-import { getGuildConfig, getBalance, addBalance, deductBalance, updateLastRob } from "../db.js";
+import { getGuildConfig, getBalance, addBalance, deductBalance, updateLastRob, incrementRobSuccesses } from "../db.js";
+import { checkAndAward } from "../lib/achievements.js";
 
 const ROB_COOLDOWN_MS  = 30 * 60 * 1000;
 const SUCCESS_CHANCE   = 0.45;
@@ -91,6 +92,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await deductBalance(interaction.guild.id, target.id, stolen);
     const newBal = await addBalance(interaction.guild.id, interaction.user.id, stolen);
     const line   = SUCCESS_LINES[Math.floor(Math.random() * SUCCESS_LINES.length)]!;
+    await incrementRobSuccesses(interaction.guild.id, interaction.user.id);
+    checkAndAward(interaction.guild.id, interaction.user.id, interaction.channel as never, em).catch(() => {});
 
     await interaction.reply({
       embeds: [
