@@ -16,26 +16,32 @@ export async function handleReactionAdd(
   reaction: MessageReaction | PartialMessageReaction,
   user: User | PartialUser
 ): Promise<void> {
+  console.log(`[RR:add] user.bot=${user.bot} emoji=${reaction.emoji.name}`);
   if (user.bot) return;
 
   if (reaction.partial) {
-    try { await reaction.fetch(); } catch { return; }
+    try { await reaction.fetch(); } catch (e) { console.log(`[RR:add] reaction fetch failed`, e); return; }
   }
   if (reaction.message.partial) {
-    try { await reaction.message.fetch(); } catch { return; }
+    try { await reaction.message.fetch(); } catch (e) { console.log(`[RR:add] message fetch failed`, e); return; }
   }
 
+  console.log(`[RR:add] guild=${reaction.message.guild?.id} msgId=${reaction.message.id}`);
   if (!reaction.message.guild) return;
 
-  const emoji   = normalizeEmoji(reaction);
-  const rr      = await getReactionRole(reaction.message.guild.id, reaction.message.id, emoji);
+  const emoji = normalizeEmoji(reaction);
+  console.log(`[RR:add] looking up emoji="${emoji}" in guild=${reaction.message.guild.id} msg=${reaction.message.id}`);
+  const rr    = await getReactionRole(reaction.message.guild.id, reaction.message.id, emoji);
+  console.log(`[RR:add] rr=`, JSON.stringify(rr));
   if (!rr) return;
 
   const member = reaction.message.guild.members.cache.get(user.id)
     ?? await reaction.message.guild.members.fetch(user.id).catch(() => null);
+  console.log(`[RR:add] member=${member?.id}`);
   if (!member) return;
 
-  await member.roles.add(rr.roleId, "Reaction role assigned").catch(() => {});
+  await member.roles.add(rr.roleId, "Reaction role assigned").catch((e) => console.log(`[RR:add] roles.add failed`, e));
+  console.log(`[RR:add] done — added role ${rr.roleId} to ${member.id}`);
 }
 
 export async function handleReactionRemove(

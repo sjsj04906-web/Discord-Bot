@@ -247,6 +247,7 @@ export function startBot(): void {
   });
 
   client.on(Events.MessageReactionAdd, async (reaction, user) => {
+    console.log(`[REACTION] emoji=${reaction.emoji.name} user=${user.id} msg=${reaction.message.id} partial=${reaction.partial} msgPartial=${reaction.message.partial}`);
     await handleReactionAdd(reaction, user);
   });
 
