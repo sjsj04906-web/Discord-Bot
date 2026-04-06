@@ -2,11 +2,11 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  Colors,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { log } from "../display.js";
 import { sendModLog } from "../modlog.js";
+import { THEME } from "../theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("kick")
@@ -30,11 +30,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const member = interaction.guild.members.cache.get(target.id);
   if (!member) {
-    await interaction.reply({ content: "That user is not in this server.", ephemeral: true });
+    await interaction.reply({ content: "Entity not found in this network.", ephemeral: true });
     return;
   }
   if (!member.kickable) {
-    await interaction.reply({ content: "I cannot kick this user — they may outrank me.", ephemeral: true });
+    await interaction.reply({ content: "Cannot disconnect this entity — insufficient clearance.", ephemeral: true });
     return;
   }
 
@@ -42,13 +42,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     await member.kick(`${reason} | Kicked by ${interaction.user.tag}`);
 
     const embed = new EmbedBuilder()
-      .setColor(Colors.Orange)
-      .setTitle("👟 Member Kicked")
+      .setColor(THEME.kick)
+      .setTitle("⚡ // ENTITY DISCONNECTED")
       .setThumbnail(target.displayAvatarURL())
       .addFields(
-        { name: "User", value: `${target} \`${target.tag}\``, inline: true },
-        { name: "Moderator", value: `${interaction.user}`, inline: true },
-        { name: "Reason", value: reason },
+        { name: "TARGET", value: `${target} \`${target.tag}\``, inline: true },
+        { name: "OPERATOR", value: `${interaction.user}`, inline: true },
+        { name: "REASON", value: reason },
       )
       .setFooter({ text: `ID: ${target.id}` })
       .setTimestamp();
@@ -57,13 +57,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     log.kick(target.tag, interaction.guild.name, reason);
 
     await sendModLog(interaction.guild, {
-      action: "👟 Kick",
-      color: Colors.Orange,
+      action: "⚡ KICK // FORCEFUL DISCONNECT",
+      color: THEME.kick,
       target,
       moderator: interaction.user,
       reason,
     });
   } catch (err) {
-    await interaction.reply({ content: `Failed to kick: ${String(err)}`, ephemeral: true });
+    await interaction.reply({ content: `Execution failed: ${String(err)}`, ephemeral: true });
   }
 }

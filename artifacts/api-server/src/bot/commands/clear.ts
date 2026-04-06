@@ -2,11 +2,11 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  Colors,
   type ChatInputCommandInteraction,
   type TextChannel,
 } from "discord.js";
 import { log } from "../display.js";
+import { THEME } from "../theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("clear")
@@ -25,7 +25,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const channel = interaction.channel as TextChannel;
 
   if (!channel) {
-    await interaction.reply({ content: "Could not find the channel.", ephemeral: true });
+    await interaction.reply({ content: "Channel not found.", ephemeral: true });
     return;
   }
 
@@ -44,25 +44,27 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .slice(0, amount);
 
     if (toDelete.length === 0) {
-      await interaction.editReply("No deletable messages found (messages older than 14 days cannot be bulk-deleted).");
+      await interaction.editReply("No purgeable transmissions found (messages older than 14 days cannot be bulk-deleted).");
       return;
     }
 
     const deleted = await channel.bulkDelete(toDelete, true);
 
     const embed = new EmbedBuilder()
-      .setColor(Colors.Aqua)
-      .setTitle("🧹 Messages Cleared")
+      .setColor(THEME.clear)
+      .setTitle("🗑️ // TRANSMISSIONS PURGED")
       .addFields(
-        { name: "Deleted", value: `${deleted.size} message(s)`, inline: true },
-        { name: "Channel", value: `${channel}`, inline: true },
-        filterUser ? { name: "Filter", value: filterUser.tag, inline: true } : { name: "\u200b", value: "\u200b", inline: true },
+        { name: "PURGED", value: `${deleted.size} message(s)`, inline: true },
+        { name: "CHANNEL", value: `${channel}`, inline: true },
+        filterUser
+          ? { name: "FILTER", value: filterUser.tag, inline: true }
+          : { name: "\u200b", value: "\u200b", inline: true },
       )
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
     log.clear(channel.name, interaction.guild?.name ?? "Unknown", deleted.size);
   } catch (err) {
-    await interaction.editReply(`Failed to delete messages: ${String(err)}`);
+    await interaction.editReply(`Purge failed: ${String(err)}`);
   }
 }

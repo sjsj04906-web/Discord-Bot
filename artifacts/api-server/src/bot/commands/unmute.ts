@@ -2,11 +2,11 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  Colors,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { log } from "../display.js";
 import { sendModLog } from "../modlog.js";
+import { THEME } from "../theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("unmute")
@@ -26,11 +26,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const member = interaction.guild.members.cache.get(target.id);
   if (!member) {
-    await interaction.reply({ content: "That user is not in this server.", ephemeral: true });
+    await interaction.reply({ content: "Entity not found in this network.", ephemeral: true });
     return;
   }
   if (!member.isCommunicationDisabled()) {
-    await interaction.reply({ content: "That user is not currently muted.", ephemeral: true });
+    await interaction.reply({ content: "This entity is not currently silenced.", ephemeral: true });
     return;
   }
 
@@ -38,12 +38,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     await member.timeout(null, `Unmuted by ${interaction.user.tag}`);
 
     const embed = new EmbedBuilder()
-      .setColor(Colors.Green)
-      .setTitle("🔊 Member Unmuted")
+      .setColor(THEME.unmute)
+      .setTitle("🔊 // COMMS RESTORED")
       .setThumbnail(target.displayAvatarURL())
       .addFields(
-        { name: "User", value: `${target} \`${target.tag}\``, inline: true },
-        { name: "Moderator", value: `${interaction.user}`, inline: true },
+        { name: "TARGET", value: `${target} \`${target.tag}\``, inline: true },
+        { name: "OPERATOR", value: `${interaction.user}`, inline: true },
       )
       .setFooter({ text: `ID: ${target.id}` })
       .setTimestamp();
@@ -52,12 +52,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     log.unmute(target.tag, interaction.guild.name);
 
     await sendModLog(interaction.guild, {
-      action: "🔊 Unmute",
-      color: Colors.Green,
+      action: "🔊 UNMUTE // COMMS RESTORED",
+      color: THEME.unmute,
       target,
       moderator: interaction.user,
     });
   } catch (err) {
-    await interaction.reply({ content: `Failed to unmute: ${String(err)}`, ephemeral: true });
+    await interaction.reply({ content: `Execution failed: ${String(err)}`, ephemeral: true });
   }
 }

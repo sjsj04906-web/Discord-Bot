@@ -2,12 +2,12 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  Colors,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { log } from "../display.js";
 import { warnings } from "../warnings.js";
 import { sendModLog } from "../modlog.js";
+import { THEME, BOT_NAME } from "../theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("warn")
@@ -35,14 +35,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   warnings.set(key, existing);
 
   const embed = new EmbedBuilder()
-    .setColor(Colors.Yellow)
-    .setTitle("⚠️ Warning Issued")
+    .setColor(THEME.warn)
+    .setTitle("⚠️ // VIOLATION LOGGED")
     .setThumbnail(target.displayAvatarURL())
     .addFields(
-      { name: "User", value: `${target} \`${target.tag}\``, inline: true },
-      { name: "Moderator", value: `${interaction.user}`, inline: true },
-      { name: "Warning #", value: String(existing.length), inline: true },
-      { name: "Reason", value: reason },
+      { name: "TARGET", value: `${target} \`${target.tag}\``, inline: true },
+      { name: "OPERATOR", value: `${interaction.user}`, inline: true },
+      { name: "WARNING #", value: String(existing.length), inline: true },
+      { name: "REASON", value: reason },
     )
     .setFooter({ text: `ID: ${target.id}` })
     .setTimestamp();
@@ -51,17 +51,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   log.warn(target.tag, interaction.guild.name, existing.length, reason);
 
   await sendModLog(interaction.guild, {
-    action: "⚠️ Warning",
-    color: Colors.Yellow,
+    action: "⚠️ WARN // VIOLATION LOGGED",
+    color: THEME.warn,
     target,
     moderator: interaction.user,
     reason,
-    extra: { "Total Warnings": String(existing.length) },
+    extra: { "TOTAL WARNINGS": String(existing.length) },
   });
 
   try {
     await target.send(
-      `⚠️ You received a warning in **${interaction.guild.name}**.\n**Reason:** ${reason}\nThis is warning **#${existing.length}**.`
+      `⚠️ **${BOT_NAME} // VIOLATION NOTICE**\n\nYou have been warned in **${interaction.guild.name}**.\n**Reason:** ${reason}\n**Warning #:** ${existing.length}`
     );
   } catch {
     // DMs closed

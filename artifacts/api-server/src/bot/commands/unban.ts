@@ -2,11 +2,11 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  Colors,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { log } from "../display.js";
 import { sendModLog } from "../modlog.js";
+import { THEME } from "../theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("unban")
@@ -33,13 +33,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     await interaction.guild.members.unban(userId, `${reason} | Unbanned by ${interaction.user.tag}`);
 
     const embed = new EmbedBuilder()
-      .setColor(Colors.Green)
-      .setTitle("🔓 User Unbanned")
+      .setColor(THEME.unban)
+      .setTitle("🔓 // ACCESS RESTORED")
       .setThumbnail(ban.user.displayAvatarURL())
       .addFields(
-        { name: "User", value: `\`${ban.user.tag}\``, inline: true },
-        { name: "Moderator", value: `${interaction.user}`, inline: true },
-        { name: "Reason", value: reason },
+        { name: "TARGET", value: `\`${ban.user.tag}\``, inline: true },
+        { name: "OPERATOR", value: `${interaction.user}`, inline: true },
+        { name: "REASON", value: reason },
       )
       .setFooter({ text: `ID: ${userId}` })
       .setTimestamp();
@@ -48,16 +48,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     log.unban(ban.user.tag, interaction.guild.name);
 
     await sendModLog(interaction.guild, {
-      action: "🔓 Unban",
-      color: Colors.Green,
+      action: "🔓 UNBAN // ACCESS RESTORED",
+      color: THEME.unban,
       target: ban.user,
       moderator: interaction.user,
       reason,
     });
   } catch {
-    await interaction.reply({
-      content: `No ban found for \`${userId}\`, or I lack permission to unban them.`,
-      ephemeral: true,
-    });
+    await interaction.reply({ content: `No ban record found for \`${userId}\`.`, ephemeral: true });
   }
 }

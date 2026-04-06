@@ -2,11 +2,11 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  Colors,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { log } from "../display.js";
 import { sendModLog } from "../modlog.js";
+import { THEME } from "../theme.js";
 
 const DURATIONS = [
   { name: "60 seconds", value: 60 },
@@ -48,11 +48,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const member = interaction.guild.members.cache.get(target.id);
   if (!member) {
-    await interaction.reply({ content: "That user is not in this server.", ephemeral: true });
+    await interaction.reply({ content: "Entity not found in this network.", ephemeral: true });
     return;
   }
   if (!member.moderatable) {
-    await interaction.reply({ content: "I cannot mute this user — they may outrank me.", ephemeral: true });
+    await interaction.reply({ content: "Cannot silence this entity — insufficient clearance.", ephemeral: true });
     return;
   }
 
@@ -60,14 +60,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     await member.timeout(durationSecs * 1000, `${reason} | Muted by ${interaction.user.tag}`);
 
     const embed = new EmbedBuilder()
-      .setColor(Colors.Purple)
-      .setTitle("🔇 Member Muted")
+      .setColor(THEME.mute)
+      .setTitle("🔇 // COMMS SILENCED")
       .setThumbnail(target.displayAvatarURL())
       .addFields(
-        { name: "User", value: `${target} \`${target.tag}\``, inline: true },
-        { name: "Moderator", value: `${interaction.user}`, inline: true },
-        { name: "Duration", value: durationLabel, inline: true },
-        { name: "Reason", value: reason },
+        { name: "TARGET", value: `${target} \`${target.tag}\``, inline: true },
+        { name: "OPERATOR", value: `${interaction.user}`, inline: true },
+        { name: "DURATION", value: durationLabel, inline: true },
+        { name: "REASON", value: reason },
       )
       .setFooter({ text: `ID: ${target.id}` })
       .setTimestamp();
@@ -76,14 +76,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     log.mute(target.tag, interaction.guild.name, durationLabel, reason);
 
     await sendModLog(interaction.guild, {
-      action: "🔇 Mute (Timeout)",
-      color: Colors.Purple,
+      action: "🔇 MUTE // COMMS SILENCED",
+      color: THEME.mute,
       target,
       moderator: interaction.user,
       reason,
       duration: durationLabel,
     });
   } catch (err) {
-    await interaction.reply({ content: `Failed to mute: ${String(err)}`, ephemeral: true });
+    await interaction.reply({ content: `Execution failed: ${String(err)}`, ephemeral: true });
   }
 }

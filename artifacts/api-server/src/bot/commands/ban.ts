@@ -2,11 +2,11 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  Colors,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { log } from "../display.js";
 import { sendModLog } from "../modlog.js";
+import { THEME } from "../theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("ban")
@@ -36,7 +36,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const member = interaction.guild.members.cache.get(target.id);
   if (member && !member.bannable) {
-    await interaction.reply({ content: "I cannot ban this user — they may outrank me.", ephemeral: true });
+    await interaction.reply({ content: "Cannot ban this entity — insufficient clearance.", ephemeral: true });
     return;
   }
 
@@ -47,13 +47,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     });
 
     const embed = new EmbedBuilder()
-      .setColor(Colors.Red)
-      .setTitle("🔨 Member Banned")
+      .setColor(THEME.ban)
+      .setTitle("💀 // ENTITY BANNED")
       .setThumbnail(target.displayAvatarURL())
       .addFields(
-        { name: "User", value: `${target} \`${target.tag}\``, inline: true },
-        { name: "Moderator", value: `${interaction.user}`, inline: true },
-        { name: "Reason", value: reason },
+        { name: "TARGET", value: `${target} \`${target.tag}\``, inline: true },
+        { name: "OPERATOR", value: `${interaction.user}`, inline: true },
+        { name: "REASON", value: reason },
       )
       .setFooter({ text: `ID: ${target.id}` })
       .setTimestamp();
@@ -62,14 +62,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     log.ban(target.tag, interaction.guild.name, reason);
 
     await sendModLog(interaction.guild, {
-      action: "🔨 Ban",
-      color: Colors.Red,
+      action: "💀 BAN // ENTITY REMOVED",
+      color: THEME.ban,
       target,
       moderator: interaction.user,
       reason,
-      extra: deleteDays > 0 ? { "Messages Deleted": `${deleteDays} day(s)` } : undefined,
+      extra: deleteDays > 0 ? { "MESSAGES PURGED": `${deleteDays} day(s)` } : undefined,
     });
   } catch (err) {
-    await interaction.reply({ content: `Failed to ban: ${String(err)}`, ephemeral: true });
+    await interaction.reply({ content: `Execution failed: ${String(err)}`, ephemeral: true });
   }
 }

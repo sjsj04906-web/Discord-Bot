@@ -2,11 +2,11 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  Colors,
   type ChatInputCommandInteraction,
   type TextChannel,
 } from "discord.js";
 import { log } from "../display.js";
+import { THEME } from "../theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("lock")
@@ -34,15 +34,15 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     }, { reason: `${reason} | Locked by ${interaction.user.tag}` });
 
     const embed = new EmbedBuilder()
-      .setColor(Colors.Red)
-      .setTitle("🔒 Channel Locked")
-      .setDescription(`${target} has been locked. Only moderators can send messages.`)
-      .addFields({ name: "Reason", value: reason })
+      .setColor(THEME.lock)
+      .setTitle("🔒 // CHANNEL LOCKED")
+      .setDescription(`${target} has been sealed. Only operators may transmit.`)
+      .addFields({ name: "REASON", value: reason })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
     log.lock(target.name, interaction.guild.name);
   } catch (err) {
-    await interaction.reply({ content: `Failed to lock channel: ${String(err)}`, ephemeral: true });
+    await interaction.reply({ content: `Failed: ${String(err)}`, ephemeral: true });
   }
 }

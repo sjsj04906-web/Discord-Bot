@@ -2,11 +2,11 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  Colors,
   type ChatInputCommandInteraction,
   type TextChannel,
 } from "discord.js";
 import { log } from "../display.js";
+import { THEME } from "../theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("slowmode")
@@ -14,10 +14,8 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
   .addIntegerOption((o) =>
     o.setName("seconds")
-      .setDescription("Delay in seconds between messages (0 to disable, max 21600)")
-      .setMinValue(0)
-      .setMaxValue(21600)
-      .setRequired(true)
+      .setDescription("Delay in seconds (0 to disable, max 21600)")
+      .setMinValue(0).setMaxValue(21600).setRequired(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -25,25 +23,25 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const channel = interaction.channel as TextChannel;
 
   if (!channel?.setRateLimitPerUser) {
-    await interaction.reply({ content: "This command can only be used in a text channel.", ephemeral: true });
+    await interaction.reply({ content: "Text channels only.", ephemeral: true });
     return;
   }
 
   try {
     await channel.setRateLimitPerUser(seconds, `Set by ${interaction.user.tag}`);
-    const label = seconds === 0 ? "disabled" : `${seconds}s`;
+    const label = seconds === 0 ? "DISABLED" : `${seconds}s`;
 
     const embed = new EmbedBuilder()
-      .setColor(seconds === 0 ? Colors.Green : Colors.Blue)
-      .setTitle(seconds === 0 ? "🔊 Slowmode Disabled" : "🐢 Slowmode Enabled")
+      .setColor(THEME.slowmode)
+      .setTitle(seconds === 0 ? "🔊 // THROTTLE REMOVED" : "🐢 // CHANNEL THROTTLED")
       .setDescription(seconds === 0
-        ? `Slowmode has been removed from ${channel}.`
-        : `Users must wait **${label}** between messages in ${channel}.`)
+        ? `Slowmode has been lifted from ${channel}.`
+        : `Transmission rate limited to **1 message every ${label}** in ${channel}.`)
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
     log.slowmode(channel.name, interaction.guild?.name ?? "Unknown", seconds);
   } catch (err) {
-    await interaction.reply({ content: `Failed to set slowmode: ${String(err)}`, ephemeral: true });
+    await interaction.reply({ content: `Failed: ${String(err)}`, ephemeral: true });
   }
 }

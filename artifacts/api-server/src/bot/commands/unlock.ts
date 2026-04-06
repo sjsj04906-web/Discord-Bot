@@ -2,11 +2,11 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  Colors,
   type ChatInputCommandInteraction,
   type TextChannel,
 } from "discord.js";
 import { log } from "../display.js";
+import { THEME } from "../theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("unlock")
@@ -30,14 +30,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     }, { reason: `Unlocked by ${interaction.user.tag}` });
 
     const embed = new EmbedBuilder()
-      .setColor(Colors.Green)
-      .setTitle("🔓 Channel Unlocked")
-      .setDescription(`${target} is now open. Members can send messages again.`)
+      .setColor(THEME.unlock)
+      .setTitle("🔓 // CHANNEL UNSEALED")
+      .setDescription(`${target} is now open. Transmissions permitted.`)
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
     log.unlock(target.name, interaction.guild.name);
   } catch (err) {
-    await interaction.reply({ content: `Failed to unlock channel: ${String(err)}`, ephemeral: true });
+    await interaction.reply({ content: `Failed: ${String(err)}`, ephemeral: true });
   }
 }

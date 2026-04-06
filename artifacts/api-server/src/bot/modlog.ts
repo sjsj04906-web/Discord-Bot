@@ -2,9 +2,9 @@ import {
   type Guild,
   EmbedBuilder,
   type TextChannel,
-  Colors,
   type User,
 } from "discord.js";
+import { BOT_NAME } from "./theme.js";
 
 const MOD_LOG_NAMES = ["mod-log", "modlog", "mod-logs", "modlogs", "audit-log", "auditlog"];
 
@@ -30,22 +30,22 @@ export async function sendModLog(guild: Guild, entry: ModLogEntry): Promise<void
   if (!channel) return;
 
   const embed = new EmbedBuilder()
-    .setTitle(`${entry.action}`)
+    .setTitle(entry.action)
     .setColor(entry.color)
     .setThumbnail(entry.target.displayAvatarURL())
     .addFields(
-      { name: "User", value: `${entry.target} \`${entry.target.tag}\``, inline: true },
-      { name: "Moderator", value: `${entry.moderator} \`${entry.moderator.tag}\``, inline: true },
+      { name: "USER", value: `${entry.target} \`${entry.target.tag}\``, inline: true },
+      { name: "OPERATOR", value: `${entry.moderator} \`${entry.moderator.tag}\``, inline: true },
     )
-    .setFooter({ text: `User ID: ${entry.target.id}` })
+    .setFooter({ text: `${BOT_NAME} • ID: ${entry.target.id}` })
     .setTimestamp();
 
   if (entry.duration) {
-    embed.addFields({ name: "Duration", value: entry.duration, inline: true });
+    embed.addFields({ name: "DURATION", value: entry.duration, inline: true });
   }
 
   if (entry.reason) {
-    embed.addFields({ name: "Reason", value: entry.reason });
+    embed.addFields({ name: "REASON", value: entry.reason });
   }
 
   if (entry.extra) {
@@ -56,5 +56,3 @@ export async function sendModLog(guild: Guild, entry: ModLogEntry): Promise<void
 
   await channel.send({ embeds: [embed] }).catch(() => {});
 }
-
-export { Colors };
