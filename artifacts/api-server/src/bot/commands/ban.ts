@@ -1,42 +1,42 @@
 import {
   SlashCommandBuilder,
   PermissionFlagsBits,
+  EmbedBuilder,
+  Colors,
   type ChatInputCommandInteraction,
 } from "discord.js";
+import { log } from "../display.js";
+import { sendModLog } from "../modlog.js";
 
 export const data = new SlashCommandBuilder()
   .setName("ban")
   .setDescription("Ban a member from the server")
   .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
-  .addUserOption((option) =>
-    option.setName("user").setDescription("The user to ban").setRequired(true)
+  .addUserOption((o) =>
+    o.setName("user").setDescription("The user to ban").setRequired(true)
   )
-  .addStringOption((option) =>
-    option.setName("reason").setDescription("Reason for the ban").setRequired(false)
+  .addStringOption((o) =>
+    o.setName("reason").setDescription("Reason for the ban").setRequired(false)
   )
-  .addIntegerOption((option) =>
-    option
-      .setName("delete_days")
-      .setDescription("Number of days of messages to delete (0-7)")
-      .setMinValue(0)
-      .setMaxValue(7)
-      .setRequired(false)
+  .addIntegerOption((o) =>
+    o.setName("delete_days")
+      .setDescription("Days of messages to delete (0-7)")
+      .setMinValue(0).setMaxValue(7).setRequired(false)
   );
 
-export async function execute(interaction: ChatInputCommandInteraction) {
+export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const target = interaction.options.getUser("user", true);
   const reason = interaction.options.getString("reason") ?? "No reason provided";
   const deleteDays = interaction.options.getInteger("delete_days") ?? 0;
 
-  const member = interaction.guild?.members.cache.get(target.id);
-
   if (!interaction.guild) {
-    await interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
+    await interaction.reply({ content: "Server only.", ephemeral: true });
     return;
   }
 
+  const member = interaction.guild.members.cache.get(target.id);
   if (member && !member.bannable) {
-    await interaction.reply({ content: "I cannot ban this user. They may have a higher role than me.", ephemeral: true });
+    await interaction.reply({ content: "I cannot ban this user — they may outrank me.", ephemeral: true });
     return;
   }
 
@@ -45,10 +45,31 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       reason: `${reason} | Banned by ${interaction.user.tag}`,
       deleteMessageSeconds: deleteDays * 86400,
     });
-    await interaction.reply({
-      content: `✅ **${target.tag}** has been banned.\n**Reason:** ${reason}`,
+
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Red)
+      .setTitle("🔨 Member Banned")
+      .setThumbnail(target.displayAvatarURL())
+      .addFields(
+        { name: "User", value: `${target} \`${target.tag}\``, inline: true },
+        { name: "Moderator", value: `${interaction.user}`, inline: true },
+        { name: "Reason", value: reason },
+      )
+      .setFooter({ text: `ID: ${target.id}` })
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed] });
+    log.ban(target.tag, interaction.guild.name, reason);
+
+    await sendModLog(interaction.guild, {
+      action: "🔨 Ban",
+      color: Colors.Red,
+      target,
+      moderator: interaction.user,
+      reason,
+      extra: deleteDays > 0 ? { "Messages Deleted": `${deleteDays} day(s)` } : undefined,
     });
   } catch (err) {
-    await interaction.reply({ content: `Failed to ban user: ${String(err)}`, ephemeral: true });
+    await interaction.reply({ content: `Failed to ban: ${String(err)}`, ephemeral: true });
   }
 }

@@ -10,6 +10,11 @@ import * as unmute from "./unmute.js";
 import * as warn from "./warn.js";
 import * as warningsCmd from "./warnings.js";
 import * as clear from "./clear.js";
+import * as slowmode from "./slowmode.js";
+import * as lock from "./lock.js";
+import * as unlock from "./unlock.js";
+import * as userinfo from "./userinfo.js";
+import * as serverinfo from "./serverinfo.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder;
@@ -25,4 +30,9 @@ export const allCommands: SlashCommand[] = [
   warn,
   warningsCmd,
   clear,
+  slowmode,
+  lock,
+  unlock,
+  userinfo,
+  serverinfo,
 ];
