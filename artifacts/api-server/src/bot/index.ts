@@ -5,7 +5,7 @@ import { handleAutoMod } from "./automod.js";
 import { handleMessageDelete, handleMessageUpdate, handleMessageBulkDelete } from "./events/messageLog.js";
 import { handleHarassmentDetection } from "./harassment.js";
 import { handleAntiRaid } from "./events/antiRaid.js";
-import { handleNewAccount, handleDehoist, handleAutoRole, handleRoleRestore } from "./events/memberJoin.js";
+import { handleNewAccount, handleDehoist, handleRoleRestore } from "./events/memberJoin.js";
 import { handleMemberLeave } from "./events/memberLeave.js";
 import { handleMemberUpdate } from "./events/memberUpdate.js";
 import { handleAntiGhostping } from "./events/antiGhostping.js";
@@ -226,7 +226,6 @@ export function startBot(): void {
     await handleDehoist(member);
     await handleWelcome(member);
     await handleRoleRestore(member);
-    await handleAutoRole(member);
     await handleInviteJoin(member as GuildMember);
   });
 
