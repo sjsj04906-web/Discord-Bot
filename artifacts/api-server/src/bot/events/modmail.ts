@@ -23,6 +23,14 @@ import {
 import { THEME, BOT_NAME } from "../theme.js";
 
 const MAIL_CHANNEL_PREFIX = "mail-";
+
+function accountAgeField(createdTimestamp: number): string {
+  const ts      = Math.floor(createdTimestamp / 1000);
+  const ageDays = (Date.now() - createdTimestamp) / 86_400_000;
+  const warning = ageDays < 7 ? " ⚠️" : "";
+  return `<t:${ts}:D>\n<t:${ts}:R>${warning}`;
+}
+
 const TRIGGERS = ["!mail", "!modmail", "!contact", "!help", "!report"];
 const PENDING_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -116,7 +124,7 @@ async function openModMailThread(user: User, guild: Guild, anonymous: boolean): 
       .setDescription(`**${user.tag}** has opened a mod mail thread.\n\nReply by typing in this channel — every message is forwarded to them automatically.\nUse \`/modmail close\` to resolve and delete this thread.`)
       .addFields(
         { name: "User",        value: `${user}`, inline: true },
-        { name: "Account Age", value: `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`, inline: true },
+        { name: "Account Age", value: accountAgeField(user.createdTimestamp), inline: true },
         { name: "Case",        value: caseId, inline: true },
       );
   }
