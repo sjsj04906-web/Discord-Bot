@@ -128,22 +128,22 @@ export function bjEmbed(game: BJGame, status: "playing" | "bust" | "win" | "lose
   const pv = handValue(game.playerCards);
   const dv = handValue(game.dealerCards);
 
-  const colorMap = { playing: 0x5865F2, bust: THEME.danger, win: THEME.success, lose: THEME.danger, push: THEME.muted };
+  const colorMap = { playing: 0x2D1B69, bust: THEME.danger, win: THEME.economy, lose: THEME.danger, push: THEME.muted };
   const titleMap = {
     playing: `🃏  Blackjack  ·  ${BOT_NAME}`,
-    bust:    `💸  Bust!  ·  ${BOT_NAME}`,
-    win:     `🏆  You Win!  ·  ${BOT_NAME}`,
-    lose:    `💸  Dealer Wins  ·  ${BOT_NAME}`,
+    bust:    `💸  Bust  ·  ${BOT_NAME}`,
+    win:     `🏆  Victory  ·  ${BOT_NAME}`,
+    lose:    `💀  House Wins  ·  ${BOT_NAME}`,
     push:    `🤝  Push  ·  ${BOT_NAME}`,
   };
   const resultMap = {
     playing: "",
-    bust:    `You went bust! Lost **${game.bet.toLocaleString()} ${em}**.`,
+    bust:    `> *The cards don't lie.* You went over — **-${game.bet.toLocaleString()} ${em}**.`,
     win:     pv === 21 && game.playerCards.length === 2
-               ? `Blackjack! Won **${Math.floor(game.bet * 1.5).toLocaleString()} ${em}**.`
-               : `You win! Won **${game.bet.toLocaleString()} ${em}**.`,
-    lose:    `You lost **${game.bet.toLocaleString()} ${em}**.`,
-    push:    `Tie — your bet of **${game.bet.toLocaleString()} ${em}** returned.`,
+               ? `> *Blackjack.* Natural — **+${Math.floor(game.bet * 1.5).toLocaleString()} ${em}**.`
+               : `> *The house folds.* You won — **+${game.bet.toLocaleString()} ${em}**.`,
+    lose:    `> *The dealer holds.* You lost — **-${game.bet.toLocaleString()} ${em}**.`,
+    push:    `> *Deadlock.* Bet of **${game.bet.toLocaleString()} ${em}** returned.`,
   };
 
   const dealerDisplay = status === "playing"
@@ -300,13 +300,16 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await interaction.reply({
       embeds: [
         new EmbedBuilder()
-          .setColor(win ? THEME.success : THEME.danger)
+          .setColor(win ? THEME.economy : THEME.danger)
           .setAuthor({ name: `🪙  Coin Flip  ·  ${BOT_NAME}` })
           .setDescription(win
-            ? `The coin landed **Heads** — you win! **+${bet.toLocaleString()} ${em}**`
-            : `The coin landed **Tails** — you lose! **-${bet.toLocaleString()} ${em}**`)
-          .addFields({ name: "New Balance", value: `${newBal.toLocaleString()} ${em}`, inline: true })
-          .setFooter({ text: `${BOT_NAME}  ·  Gambling` }),
+            ? `> *The coin reads your fate.* **Heads** — **+${bet.toLocaleString()} ${em}**`
+            : `> *Chance is indifferent.* **Tails** — **-${bet.toLocaleString()} ${em}**`)
+          .addFields(
+            { name: "◈ Result",  value: win ? "✅ Win" : "❌ Loss",              inline: true },
+            { name: "◈ Balance", value: `${newBal.toLocaleString()} ${em}`,      inline: true },
+          )
+          .setFooter({ text: `Stake: ${bet.toLocaleString()} ${em}  ·  ${BOT_NAME} ◆ Gambling` }),
       ],
     });
     return;
@@ -329,15 +332,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await interaction.reply({
       embeds: [
         new EmbedBuilder()
-          .setColor(multiplier > 1 ? THEME.success : multiplier > 0 ? THEME.warn : THEME.danger)
+          .setColor(multiplier > 1 ? THEME.economy : multiplier > 0 ? THEME.warn : THEME.danger)
           .setAuthor({ name: `🎰  Slot Machine  ·  ${BOT_NAME}` })
-          .setDescription(`## ${reels.join("  ")}`)
+          .setDescription(`## ${reels.join("  ")}\n${label}`)
           .addFields(
-            { name: "Result",      value: label,                                                     inline: false },
-            { name: "Payout",      value: delta >= 0 ? `+${delta.toLocaleString()} ${em}` : `${delta.toLocaleString()} ${em}`, inline: true },
-            { name: "New Balance", value: `${newBal.toLocaleString()} ${em}`,                        inline: true },
+            { name: "◈ Payout",  value: delta >= 0 ? `**+${delta.toLocaleString()}** ${em}` : `${delta.toLocaleString()} ${em}`, inline: true },
+            { name: "◈ Balance", value: `${newBal.toLocaleString()} ${em}`,                                                      inline: true },
           )
-          .setFooter({ text: `Bet: ${bet.toLocaleString()} ${em}  ·  ${BOT_NAME} Gambling` }),
+          .setFooter({ text: `Stake: ${bet.toLocaleString()} ${em}  ·  ${BOT_NAME} ◆ Gambling` }),
       ],
     });
     return;
@@ -365,16 +367,16 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await interaction.reply({
       embeds: [
         new EmbedBuilder()
-          .setColor(win ? THEME.success : THEME.danger)
+          .setColor(win ? THEME.economy : THEME.danger)
           .setAuthor({ name: `🎡  Roulette  ·  ${BOT_NAME}` })
-          .setDescription(`The wheel landed on **${colorEmoji} ${roll}** (${resultColor})`)
+          .setDescription(`> The wheel spins. It slows. It stops.\n> **${colorEmoji} ${roll}** — ${resultColor.toUpperCase()}.`)
           .addFields(
-            { name: "Your Bet",    value: `${colorEmoji} ${choice} (${multipliers[choice]}×)`,                                        inline: true },
-            { name: "Result",      value: win ? `✅ Win!` : `❌ Lose`,                                                                 inline: true },
-            { name: "Payout",      value: delta >= 0 ? `+${delta.toLocaleString()} ${em}` : `${delta.toLocaleString()} ${em}`,         inline: true },
-            { name: "New Balance", value: `${newBal.toLocaleString()} ${em}`,                                                         inline: true },
+            { name: "◈ Your Call",  value: `${colorEmoji} ${choice} (${multipliers[choice]}×)`,                                      inline: true },
+            { name: "◈ Verdict",    value: win ? `✅ **Win**` : `❌ **Loss**`,                                                        inline: true },
+            { name: "◈ Payout",     value: delta >= 0 ? `**+${delta.toLocaleString()}** ${em}` : `${delta.toLocaleString()} ${em}`,   inline: true },
+            { name: "◈ Balance",    value: `${newBal.toLocaleString()} ${em}`,                                                       inline: true },
           )
-          .setFooter({ text: `Bet: ${bet.toLocaleString()} ${em}  ·  ${BOT_NAME} Gambling` }),
+          .setFooter({ text: `Stake: ${bet.toLocaleString()} ${em}  ·  ${BOT_NAME} ◆ Gambling` }),
       ],
     });
     return;

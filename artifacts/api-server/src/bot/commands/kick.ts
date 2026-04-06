@@ -11,13 +11,13 @@ import { randomKickLine } from "../utils/savagelines.js";
 
 export const data = new SlashCommandBuilder()
   .setName("kick")
-  .setDescription("Kick a member from the server")
+  .setDescription("Forcibly remove a member from the server")
   .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
   .addUserOption((o) =>
-    o.setName("user").setDescription("The user to kick").setRequired(true)
+    o.setName("user").setDescription("The member to remove").setRequired(true)
   )
   .addStringOption((o) =>
-    o.setName("reason").setDescription("Reason for the kick").setRequired(false)
+    o.setName("reason").setDescription("Reason for removal").setRequired(false)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -31,43 +31,43 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const member = interaction.guild.members.cache.get(target.id);
   if (!member) {
-    await interaction.reply({ content: "That member isn't in this server.", ephemeral: true });
+    await interaction.reply({ content: "That member is not in this server.", ephemeral: true });
     return;
   }
   if (!member.kickable) {
-    await interaction.reply({ content: "I don't have permission to kick this member.", ephemeral: true });
+    await interaction.reply({ content: "I cannot remove this member — they outrank me.", ephemeral: true });
     return;
   }
 
   try {
-    await member.kick(`${reason} — kicked by ${interaction.user.tag}`);
+    await member.kick(`${reason} — ${interaction.user.tag}`);
 
     const embed = new EmbedBuilder()
       .setColor(THEME.kick)
-      .setAuthor({ name: `⚡  Member Kicked  ·  ${BOT_NAME}` })
+      .setAuthor({ name: `⚡  Member Removed  ·  ${BOT_NAME}` })
       .setTitle(target.tag)
       .setURL(`https://discord.com/users/${target.id}`)
-      .setDescription(`*${randomKickLine()}*`)
+      .setDescription(`> *"${randomKickLine()}"*`)
       .setThumbnail(target.displayAvatarURL())
       .addFields(
-        { name: "Member",    value: `${target}`, inline: true },
-        { name: "Moderator", value: `${interaction.user}`, inline: true },
+        { name: "◈ Member",    value: `${target}`,           inline: true },
+        { name: "◈ Moderator", value: `${interaction.user}`, inline: true },
+        { name: "◈ Reason",    value: reason },
       )
-      .addFields({ name: "Reason", value: reason })
-      .setFooter({ text: `ID: ${target.id}` })
+      .setFooter({ text: `User ID: ${target.id}  ·  ${BOT_NAME} ◆ Moderation` })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
     log.kick(target.tag, interaction.guild.name, reason);
 
     await sendModLog(interaction.guild, {
-      action: "⚡  Member Kicked",
+      action: "⚡  Member Removed",
       color: THEME.kick,
       target,
       moderator: interaction.user,
       reason,
     });
   } catch (err) {
-    await interaction.reply({ content: `Failed to kick member: ${String(err)}`, ephemeral: true });
+    await interaction.reply({ content: `Failed to remove member: ${String(err)}`, ephemeral: true });
   }
 }

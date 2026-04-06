@@ -18,18 +18,22 @@ const SUCCESS_LINES = [
   "Clean extraction. They never saw you coming.",
   "The heist went flawless. Credits transferred.",
   "You ghosted their security and drained the wallet.",
+  "In. Out. Untraceable. Textbook.",
+  "The target's ICE crumbled on contact.",
 ];
 const FAIL_LINES = [
   "Their ICE caught you cold. Pay the fine.",
   "The mark was packing countermeasures. You got burned.",
   "You tripped a proximity sensor. Wallet hit incoming.",
   "Security drone spotted you. Time to pay up.",
+  "Sloppy. The grid was watching.",
+  "Countermeasures detonated. Your wallet took the blast.",
 ];
 
 export const data = new SlashCommandBuilder()
   .setName("rob")
-  .setDescription("Attempt to steal coins from another user's wallet")
-  .addUserOption((o) => o.setName("target").setDescription("Who to rob").setRequired(true));
+  .setDescription("Breach a target's wallet — risk it for the biscuit")
+  .addUserOption((o) => o.setName("target").setDescription("Who to breach").setRequired(true));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) return;
@@ -39,14 +43,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   if (target.id === interaction.user.id) {
     await interaction.reply({
-      embeds: [new EmbedBuilder().setColor(THEME.danger).setDescription("❌ You can't rob yourself.")],
+      embeds: [new EmbedBuilder().setColor(THEME.danger).setDescription("> You can't breach your own wallet, choom.")],
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
   if (target.bot) {
     await interaction.reply({
-      embeds: [new EmbedBuilder().setColor(THEME.danger).setDescription("❌ Bots don't carry wallets.")],
+      embeds: [new EmbedBuilder().setColor(THEME.danger).setDescription("> Bots run on corporate servers. No wallet to breach.")],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -58,7 +62,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   if (robberEco.lastRob && now - robberEco.lastRob.getTime() < ROB_COOLDOWN_MS) {
     const next = robberEco.lastRob.getTime() + ROB_COOLDOWN_MS;
     await interaction.reply({
-      embeds: [new EmbedBuilder().setColor(THEME.warn).setDescription(`⏳ Lie low. You can rob again <t:${Math.floor(next / 1000)}:R>.`)],
+      embeds: [new EmbedBuilder().setColor(THEME.warn)
+        .setAuthor({ name: `🕵️  Breach Cooldown  ·  ${BOT_NAME}` })
+        .setDescription(`> Lie low. Your next window opens <t:${Math.floor(next / 1000)}:R>.`)
+        .setFooter({ text: `${BOT_NAME}  ◆  Economy` })],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -68,7 +75,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   if (targetEco.balance < MIN_STEAL_TARGET) {
     await interaction.reply({
-      embeds: [new EmbedBuilder().setColor(THEME.muted).setDescription(`🤷 ${target.username} is broke — not worth the risk.`)],
+      embeds: [new EmbedBuilder().setColor(THEME.muted)
+        .setDescription(`> **${target.username}** is running on fumes — not worth the exposure.`)],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -76,7 +84,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   if (robberEco.balance < 50) {
     await interaction.reply({
-      embeds: [new EmbedBuilder().setColor(THEME.danger).setDescription(`❌ You need at least **50 ${em}** in your wallet before attempting a heist.`)],
+      embeds: [new EmbedBuilder().setColor(THEME.danger)
+        .setDescription(`> You need at least **50 ${em}** in reserve before attempting a breach.`)],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -99,14 +108,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       embeds: [
         new EmbedBuilder()
           .setColor(THEME.success)
-          .setAuthor({ name: `🦹  Rob  ·  ${BOT_NAME}` })
-          .setDescription(`**${line}**`)
+          .setAuthor({ name: `🦹  Breach Successful  ·  ${BOT_NAME}` })
+          .setDescription(`> *"${line}"*`)
           .addFields(
-            { name: "Target",      value: `${target}`,                           inline: true },
-            { name: "Stolen",      value: `+${stolen.toLocaleString()} ${em}`,   inline: true },
-            { name: "New Balance", value: `${newBal.toLocaleString()} ${em}`,    inline: true },
+            { name: "◈ Target",  value: `${target}`,                            inline: true },
+            { name: "◈ Extracted", value: `**+${stolen.toLocaleString()}** ${em}`, inline: true },
+            { name: "◈ Balance", value: `${newBal.toLocaleString()} ${em}`,     inline: true },
           )
-          .setFooter({ text: `Next rob available in 30 minutes` })
+          .setFooter({ text: `Cooldown: 30 min  ·  ${BOT_NAME} ◆ Economy` })
           .setTimestamp(),
       ],
     });
@@ -121,14 +130,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       embeds: [
         new EmbedBuilder()
           .setColor(THEME.danger)
-          .setAuthor({ name: `🚨  Busted!  ·  ${BOT_NAME}` })
-          .setDescription(`**${line}**`)
+          .setAuthor({ name: `🚨  Breach Neutralised  ·  ${BOT_NAME}` })
+          .setDescription(`> *"${line}"*`)
           .addFields(
-            { name: "Target",      value: `${target}`,                        inline: true },
-            { name: "Fine Paid",   value: `-${fine.toLocaleString()} ${em}`,  inline: true },
-            { name: "New Balance", value: `${newBal.toLocaleString()} ${em}`, inline: true },
+            { name: "◈ Target",    value: `${target}`,                         inline: true },
+            { name: "◈ Fine Paid", value: `**-${fine.toLocaleString()}** ${em}`, inline: true },
+            { name: "◈ Balance",   value: `${newBal.toLocaleString()} ${em}`,  inline: true },
           )
-          .setFooter({ text: `Next rob available in 30 minutes` })
+          .setFooter({ text: `Cooldown: 30 min  ·  ${BOT_NAME} ◆ Economy` })
           .setTimestamp(),
       ],
     });

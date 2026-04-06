@@ -2,19 +2,18 @@ import {
   SlashCommandBuilder, EmbedBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
-import { THEME, BOT_NAME } from "../theme.js";
+import { BOT_NAME } from "../theme.js";
 import { getGuildConfig, addBalance, incrementFishCount } from "../db.js";
 import { checkAndAward } from "../lib/achievements.js";
 
-
 const CATCHES = [
-  { name: "Glitch Byte",        emoji: "🐡", min: 5,    max: 20,   weight: 35, rarity: "Common"    },
-  { name: "Neon Carp",          emoji: "🐠", min: 20,   max: 60,   weight: 28, rarity: "Common"    },
-  { name: "Circuit Eel",        emoji: "🐍", min: 60,   max: 120,  weight: 18, rarity: "Uncommon"  },
-  { name: "Corrupted Salmon",   emoji: "🐟", min: 100,  max: 200,  weight: 10, rarity: "Uncommon"  },
-  { name: "Phantom Shark",      emoji: "🦈", min: 200,  max: 400,  weight: 6,  rarity: "Rare"      },
-  { name: "Data Leviathan",     emoji: "🐳", min: 400,  max: 750,  weight: 2,  rarity: "Epic"      },
-  { name: "Quantum Koi",        emoji: "✨", min: 750,  max: 1500, weight: 1,  rarity: "Legendary" },
+  { name: "Glitch Byte",      emoji: "🐡", min: 5,    max: 20,   weight: 35, rarity: "Common"    },
+  { name: "Neon Carp",        emoji: "🐠", min: 20,   max: 60,   weight: 28, rarity: "Common"    },
+  { name: "Circuit Eel",      emoji: "🐍", min: 60,   max: 120,  weight: 18, rarity: "Uncommon"  },
+  { name: "Corrupted Salmon", emoji: "🐟", min: 100,  max: 200,  weight: 10, rarity: "Uncommon"  },
+  { name: "Phantom Shark",    emoji: "🦈", min: 200,  max: 400,  weight: 6,  rarity: "Rare"      },
+  { name: "Data Leviathan",   emoji: "🐳", min: 400,  max: 750,  weight: 2,  rarity: "Epic"      },
+  { name: "Quantum Koi",      emoji: "✨", min: 750,  max: 1500, weight: 1,  rarity: "Legendary" },
 ];
 
 const JUNK = [
@@ -23,15 +22,31 @@ const JUNK = [
   "someone's lost keyfob",
   "a waterlogged terminal",
   "a broken drone wing",
+  "a ghost-encrypted hard drive",
+  "a cracked neural interface",
 ];
 
 const RARITY_COLORS: Record<string, number> = {
-  Common:    0x9B9B9B,
-  Uncommon:  0x2ECC71,
-  Rare:      0x3498DB,
-  Epic:      0x9B59B6,
-  Legendary: 0xFFD700,
+  Common:    0x607D8B,
+  Uncommon:  0x00897B,
+  Rare:      0x1565C0,
+  Epic:      0x6A1B9A,
+  Legendary: 0xFFB703,
 };
+
+const RARITY_LABEL: Record<string, string> = {
+  Common:    "◈ Common",
+  Uncommon:  "◈◈ Uncommon",
+  Rare:      "◈◈◈ Rare",
+  Epic:      "◈◈◈◈ Epic",
+  Legendary: "◈◈◈◈◈ Legendary",
+};
+
+const LEGENDARY_LINES = [
+  "The signal sang before you pulled it up.",
+  "A ghost in the deep — yours now.",
+  "The grid falls silent. Everyone felt that catch.",
+];
 
 function pickCatch() {
   const total = CATCHES.reduce((a, c) => a + c.weight, 0);
@@ -45,7 +60,7 @@ function pickCatch() {
 
 export const data = new SlashCommandBuilder()
   .setName("fish")
-  .setDescription("Cast your line into the digital ocean");
+  .setDescription("Cast your line into the digital deep");
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) return;
@@ -60,32 +75,39 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()
-          .setColor(THEME.muted)
-          .setAuthor({ name: `🎣  Fishing  ·  ${BOT_NAME}` })
-          .setDescription(`You reeled in... **${junk}**.\nBetter luck next time, choom.`),
+          .setColor(0x2D2B55)
+          .setAuthor({ name: `🎣  Deep Water Fishing  ·  ${BOT_NAME}` })
+          .setDescription(`You reeled in **${junk}**.\n> *Not everything in the deep is worth keeping, choom.*`)
+          .setFooter({ text: `${BOT_NAME}  ◆  Economy` }),
       ],
     });
     return;
   }
 
-  const catch_ = pickCatch();
-  const earned = Math.floor(Math.random() * (catch_.max - catch_.min + 1)) + catch_.min;
+  const catch_  = pickCatch();
+  const earned  = Math.floor(Math.random() * (catch_.max - catch_.min + 1)) + catch_.min;
+  const isLegend = catch_.rarity === "Legendary";
 
   await incrementFishCount(interaction.guild.id, interaction.user.id);
   const newBal = await addBalance(interaction.guild.id, interaction.user.id, earned);
   checkAndAward(interaction.guild.id, interaction.user.id, interaction.channel as never, em).catch(() => {});
 
+  const flavor = isLegend
+    ? `\n> *${LEGENDARY_LINES[Math.floor(Math.random() * LEGENDARY_LINES.length)]}*`
+    : "";
+
   await interaction.editReply({
     embeds: [
       new EmbedBuilder()
         .setColor(RARITY_COLORS[catch_.rarity]!)
-        .setAuthor({ name: `🎣  Fishing  ·  ${BOT_NAME}` })
-        .setDescription(`${catch_.emoji} You caught a **${catch_.name}**!`)
+        .setAuthor({ name: `🎣  Deep Water Fishing  ·  ${BOT_NAME}` })
+        .setDescription(`${catch_.emoji}  **${catch_.name}** — hauled from the digital deep.${flavor}`)
         .addFields(
-          { name: "Rarity",      value: catch_.rarity,                       inline: true },
-          { name: "Sold For",    value: `+${earned.toLocaleString()} ${em}`, inline: true },
-          { name: "New Balance", value: `${newBal.toLocaleString()} ${em}`,  inline: true },
+          { name: "Rarity",    value: RARITY_LABEL[catch_.rarity]!,           inline: true },
+          { name: "Sold For",  value: `**+${earned.toLocaleString()}** ${em}`, inline: true },
+          { name: "Balance",   value: `${newBal.toLocaleString()} ${em}`,      inline: true },
         )
+        .setFooter({ text: `${BOT_NAME}  ◆  Economy` })
         .setTimestamp(),
     ],
   });

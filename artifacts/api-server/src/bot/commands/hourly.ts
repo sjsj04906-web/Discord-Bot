@@ -4,14 +4,14 @@ import {
 } from "discord.js";
 import { THEME, BOT_NAME } from "../theme.js";
 import { getGuildConfig, getBalance, addBalance, updateLastHourly } from "../db.js";
-import { PRESTIGE_BONUS } from "./prestige.js";
+import { PRESTIGE_BONUS, getPrestigeInfo } from "./prestige.js";
 
-const HOURLY_MS = 60 * 60 * 1000;
+const HOURLY_MS     = 60 * 60 * 1000;
 const HOURLY_AMOUNT = 50;
 
 export const data = new SlashCommandBuilder()
   .setName("hourly")
-  .setDescription("Claim a small hourly coin reward");
+  .setDescription("Tap into the grid for a small hourly payout");
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) return;
@@ -26,7 +26,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       embeds: [
         new EmbedBuilder()
           .setColor(THEME.warn)
-          .setDescription(`⏳ Hourly already claimed. Come back <t:${Math.floor(next / 1000)}:R>!`),
+          .setAuthor({ name: `⚡  Hourly Reward  ·  ${BOT_NAME}` })
+          .setDescription(`> Channel locked. Signal resets <t:${Math.floor(next / 1000)}:R>.`)
+          .setFooter({ text: `${BOT_NAME}  ◆  Economy` }),
       ],
       flags: MessageFlags.Ephemeral,
     });
@@ -35,21 +37,26 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const multiplier = 1 + eco.prestige * PRESTIGE_BONUS;
   const payout     = Math.floor(HOURLY_AMOUNT * multiplier);
+  const pInfo      = getPrestigeInfo(eco.prestige);
 
   await updateLastHourly(interaction.guild.id, interaction.user.id);
   const newBal = await addBalance(interaction.guild.id, interaction.user.id, payout);
 
+  const desc = eco.prestige > 0
+    ? `> You tapped the grid and collected your signal cut.\n> *${pInfo.badge} ${pInfo.title} — +${Math.round(eco.prestige * PRESTIGE_BONUS * 100)}% applied*`
+    : `> You tapped the grid and collected your signal cut.`;
+
   await interaction.reply({
     embeds: [
       new EmbedBuilder()
-        .setColor(0x00FFCC)
-        .setAuthor({ name: `⚡  Hourly Reward  ·  ${BOT_NAME}` })
-        .setDescription(`You jacked into the grid and snagged your hourly payout.`)
+        .setColor(eco.prestige > 0 ? pInfo.color : THEME.economy)
+        .setAuthor({ name: `⚡  Hourly Payout  ·  ${BOT_NAME}` })
+        .setDescription(desc)
         .addFields(
-          { name: "Earned",      value: `+${payout} ${em}`,                    inline: true },
-          { name: "New Balance", value: `${newBal.toLocaleString()} ${em}`,     inline: true },
+          { name: "◈ Earned",  value: `**+${payout.toLocaleString()}** ${em}`, inline: true },
+          { name: "◈ Balance", value: `${newBal.toLocaleString()} ${em}`,      inline: true },
         )
-        .setFooter({ text: `Next hourly available in 1 hour` })
+        .setFooter({ text: `Next channel opens in 1 hour  ·  ${BOT_NAME} ◆ Economy` })
         .setTimestamp(),
     ],
   });

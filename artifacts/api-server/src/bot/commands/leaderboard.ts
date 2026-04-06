@@ -28,24 +28,26 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const rows = await getLeaderboard(interaction.guild.id, limit, offset);
 
   if (rows.length === 0) {
-    await interaction.editReply({ content: page > 0 ? "No more entries." : "No XP recorded yet." });
+    await interaction.editReply({ content: page > 0 ? "No more entries on this page." : "No XP recorded yet." });
     return;
   }
 
-  const medals = ["🥇", "🥈", "🥉"];
-  const lines  = rows.map((r, i) => {
-    const rank   = offset + i + 1;
-    const medal  = medals[i] && page === 0 ? medals[i]! : `\`#${rank}\``;
-    const level  = levelFromXp(r.xp);
-    return `${medal} <@${r.userId}>  —  **Lv ${level}**  ·  ${r.xp.toLocaleString()} XP  ·  ${r.messageCount.toLocaleString()} msgs`;
+  const TIER_ICONS = ["👑", "⭐", "🏅", "◈", "◈"];
+  const lines = rows.map((r, i) => {
+    const rank    = offset + i + 1;
+    const icon    = page === 0 && i < 3 ? TIER_ICONS[i]! : `\`#${rank}\``;
+    const level   = levelFromXp(r.xp);
+    const xpStr   = r.xp.toLocaleString();
+    const msgStr  = r.messageCount.toLocaleString();
+    return `${icon}  <@${r.userId}> — **Lv ${level}** ・ ${xpStr} XP ・ ${msgStr} msgs`;
   });
 
   const embed = new EmbedBuilder()
-    .setColor(THEME.info)
+    .setColor(THEME.xp)
     .setAuthor({ name: `🏆  XP Leaderboard  ·  ${BOT_NAME}` })
     .setTitle(interaction.guild.name)
     .setDescription(lines.join("\n"))
-    .setFooter({ text: `Page ${page + 1}  ·  use /leaderboard page:2 for more` })
+    .setFooter({ text: `Page ${page + 1}  ·  /leaderboard page:2 for more  ·  ${BOT_NAME} ◆ XP` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });

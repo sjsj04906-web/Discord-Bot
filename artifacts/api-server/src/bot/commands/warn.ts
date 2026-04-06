@@ -14,10 +14,10 @@ const MUTE_THRESHOLD = 5;
 
 export const data = new SlashCommandBuilder()
   .setName("warn")
-  .setDescription("Issue a warning to a member")
+  .setDescription("Issue a formal warning to a member")
   .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
   .addUserOption((o) =>
-    o.setName("user").setDescription("The user to warn").setRequired(true)
+    o.setName("user").setDescription("The member to warn").setRequired(true)
   )
   .addStringOption((o) =>
     o.setName("reason").setDescription("Reason for the warning").setRequired(true)
@@ -35,48 +35,62 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   await addWarning(interaction.guild.id, target.id, reason, interaction.user.tag);
   const total = await countWarnings(interaction.guild.id, target.id);
 
-  let dmNote = "";
+  let dmFailed = false;
   try {
-    await target.send(
-      `⚠️ **Warning from ${interaction.guild.name}**\n\n**Reason:** ${reason}\n**Warning count:** ${total}`
-    );
+    await target.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(THEME.warn)
+          .setAuthor({ name: `⚠️  Formal Warning  ·  ${BOT_NAME}` })
+          .setDescription(`You have received a warning in **${interaction.guild.name}**.`)
+          .addFields(
+            { name: "◈ Reason",         value: reason },
+            { name: "◈ Warning Count",  value: `${total} of ${MUTE_THRESHOLD} (auto-mute threshold)`, inline: true },
+          )
+          .setFooter({ text: `${BOT_NAME}  ◆  Moderation` })
+          .setTimestamp(),
+      ],
+    });
   } catch {
-    dmNote = "Could not DM this member — their direct messages are closed.";
+    dmFailed = true;
   }
 
   const nearThreshold = total === MUTE_THRESHOLD - 1;
+  const embedColor    = total >= MUTE_THRESHOLD ? THEME.escalate : nearThreshold ? THEME.escalate : THEME.warn;
 
   const embed = new EmbedBuilder()
-    .setColor(nearThreshold ? THEME.escalate : THEME.warn)
-    .setAuthor({ name: `⚠️  Member Warned  ·  ${BOT_NAME}` })
+    .setColor(embedColor)
+    .setAuthor({ name: `⚠️  Warning Issued  ·  ${BOT_NAME}` })
     .setTitle(target.tag)
     .setURL(`https://discord.com/users/${target.id}`)
-    .setDescription(`*${randomWarnLine()}*`)
+    .setDescription(`> *"${randomWarnLine()}"*`)
     .setThumbnail(target.displayAvatarURL())
     .addFields(
-      { name: "Member",       value: `${target}`, inline: true },
-      { name: "Moderator",    value: `${interaction.user}`, inline: true },
-      { name: "Warning #",    value: `${total}${nearThreshold ? "  ⚡" : ""}`, inline: true },
+      { name: "◈ Member",    value: `${target}`,           inline: true },
+      { name: "◈ Moderator", value: `${interaction.user}`, inline: true },
+      { name: "◈ Strike",    value: `**#${total}**${nearThreshold ? "  ⚡" : ""}`, inline: true },
+      { name: "◈ Reason",    value: reason },
     )
-    .addFields({ name: "Reason", value: reason })
-    .setFooter({ text: `ID: ${target.id}${dmNote ? "  ·  DM failed" : "  ·  Member notified"}` })
+    .setFooter({
+      text: `User ID: ${target.id}  ·  ${dmFailed ? "DM failed" : "Member notified"}  ·  ${BOT_NAME} ◆ Moderation`,
+    })
     .setTimestamp();
 
-  const extras: string[] = [];
-  if (dmNote) extras.push(`> ⚠️ ${dmNote}`);
-  if (nearThreshold) extras.push(`> ⚡ **${target.username}** is one warning away from the auto-mute threshold.`);
+  const notices: string[] = [];
+  if (dmFailed)       notices.push(`> ⚠️ Could not DM this member — their messages are closed.`);
+  if (nearThreshold)  notices.push(`> ⚡ **${target.username}** is one strike from the auto-mute threshold.`);
 
-  await interaction.reply({ embeds: [embed], content: extras.length ? extras.join("\n") : undefined });
+  await interaction.reply({ embeds: [embed], content: notices.length ? notices.join("\n") : undefined });
   log.warn(target.tag, interaction.guild.name, total, reason);
 
   await sendModLog(interaction.guild, {
-    action: "⚠️  Member Warned",
-    color: THEME.warn,
+    action: "⚠️  Warning Issued",
+    color: embedColor,
     target,
     moderator: interaction.user,
     reason,
     extra: {
-      "Warning Count": nearThreshold ? `${total} — one away from auto-mute` : String(total),
+      "Strike Count": nearThreshold ? `${total} — one from auto-mute` : String(total),
     },
   });
 }
