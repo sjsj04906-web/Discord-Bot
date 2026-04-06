@@ -8,6 +8,7 @@ import { log } from "../display.js";
 import { addWarning, countWarnings } from "../db.js";
 import { sendModLog } from "../modlog.js";
 import { THEME, BOT_NAME } from "../theme.js";
+import { randomWarnLine } from "../utils/savagelines.js";
 
 const MUTE_THRESHOLD = 5;
 
@@ -50,6 +51,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     .setAuthor({ name: `⚠️  Member Warned  ·  ${BOT_NAME}` })
     .setTitle(target.tag)
     .setURL(`https://discord.com/users/${target.id}`)
+    .setDescription(`*${randomWarnLine()}*`)
     .setThumbnail(target.displayAvatarURL())
     .addFields(
       { name: "Member",       value: `${target}`, inline: true },

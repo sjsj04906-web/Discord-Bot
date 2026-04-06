@@ -24,6 +24,23 @@ const BAN_LINES = [
   "L + ratio + banned.",
   "Your appeal has been pre-denied.",
   "Permanently out of stock.",
+  "We gave you rope. You found a way to hang yourself with it.",
+  "The audacity. Truly. The unmitigated audacity.",
+  "History will not remember you fondly.",
+  "You have been manually removed from the gene pool of this server.",
+  "Somewhere, a rules channel is weeping.",
+  "Account terminated. No refunds.",
+  "You absolute unit of a mistake.",
+  "This one's going in the hall of shame.",
+  "Zero ping. Zero chance. Zero return.",
+  "Even the bots are embarrassed for you.",
+  "Your legacy is a ban log entry.",
+  "Ejected. No parachute.",
+  "Unsubscribed. Muted. Blocked. Banned.",
+  "The vibe was off from the start. This is the natural conclusion.",
+  "One less problem.",
+  "Archived and forgotten.",
+  "Congrats — you made the list nobody wants to be on.",
 ];
 
 const KICK_LINES = [
@@ -51,11 +68,56 @@ const KICK_LINES = [
   "Unfortunately, your vibe does not match this server's energy.",
   "One ticket to the outside, issued.",
   "Time to reflect. Outside. Away from here.",
+  "Please collect your things.",
+  "Not banned. Just… unwelcome.",
+  "We'll keep your spot warm. No we won't.",
+  "On behalf of the server, goodbye.",
+  "Removed with the energy of a disappointed parent.",
+  "Catch you on the flip side. Or don't.",
+  "Your services are no longer required.",
+  "Voted least likely to stay.",
+  "You've unlocked: the exit.",
+  "The bouncer has spoken.",
+  "Return ticket not included.",
+  "Gently, but firmly, removed.",
+  "This isn't a ban, it's an opportunity to grow.",
+  "Your invitation to remain has been rescinded.",
+  "We're not mad. Just disappointed. And kicking you.",
+  "Goodbye. Drive safe. Don't come back.",
+];
+
+const WARN_LINES = [
+  "Consider this your one free mistake.",
+  "The file has been opened. Don't add to it.",
+  "Noted. And not in a good way.",
+  "One strike down. Choose the next move wisely.",
+  "This is your sign to read the rules again.",
+  "The logs don't lie, and neither does this warning.",
+  "We see you. We always see you.",
+  "A friendly reminder that consequences are real.",
+  "This warning has been personally signed by the ban hammer.",
+  "Clip saved. Warning issued.",
+  "Your behavior has been flagged, reviewed, and found lacking.",
+  "Consider yourself officially on thin ice.",
+  "The mods have noticed. That's not the flex you think it is.",
+  "Strike registered. Proceed accordingly.",
+  "You're collecting warnings like they're achievements.",
+  "Every ban starts exactly like this.",
+  "The council has taken note of your activities.",
+  "Don't make us make this a ban.",
+  "This goes on your permanent record.",
+  "Logged, stamped, filed, and witnessed.",
+  "You're one step closer to a permanent vacation.",
+  "This is your yellow card. Red is next.",
+  "Warned. The clock is ticking.",
+  "This isn't a threat. It's a preview.",
+  "Keep it up and see what happens. Actually, don't.",
 ];
 
 function pick(arr: string[]): string {
   return arr[Math.floor(Math.random() * arr.length)]!;
 }
 
-export function randomBanLine(): string  { return pick(BAN_LINES); }
+export function randomBanLine():  string { return pick(BAN_LINES);  }
 export function randomKickLine(): string { return pick(KICK_LINES); }
+export function randomWarnLine(): string { return pick(WARN_LINES); }
