@@ -96,10 +96,8 @@ export function startBot(): void {
   client.on("raw" as never, async (packet: { t: string; d: Record<string, unknown> }) => {
     if (packet.t !== "MESSAGE_CREATE" || packet.d["guild_id"]) return;
 
-    const channelId  = packet.d["channel_id"] as string;
-    const messageId  = packet.d["id"] as string;
-    const authorData = packet.d["author"] as Record<string, unknown> | undefined;
-    console.log(`[raw-dm] DM received — channel=${channelId} author=${authorData?.["username"]}`);
+    const channelId = packet.d["channel_id"] as string;
+    const messageId = packet.d["id"] as string;
 
     try {
       const channel = await client.channels.fetch(channelId);

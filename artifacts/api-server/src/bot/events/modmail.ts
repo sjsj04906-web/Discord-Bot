@@ -24,9 +24,8 @@ async function forwardDmToMod(message: Message, guild: Guild): Promise<void> {
   if (!config.modMailChannelId) return;
 
   // Use fetch — cache.get misses channels not yet cached after restart
-  console.log(`[modmail] fetching parent channel ${config.modMailChannelId}...`);
-  const modChannel = await guild.channels.fetch(config.modMailChannelId).catch((e) => { console.error("[modmail] fetch modChannel error:", e); return null; }) as TextChannel | null;
-  if (!modChannel) { console.error("[modmail] modChannel not found or fetch failed"); return; }
+  const modChannel = await guild.channels.fetch(config.modMailChannelId).catch(() => null) as TextChannel | null;
+  if (!modChannel) return;
 
   const user     = message.author;
   const safeName = user.username.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20) || "user";
@@ -90,7 +89,6 @@ async function forwardDmToMod(message: Message, guild: Guild): Promise<void> {
       }
     }
 
-    console.log(`[modmail] creating channel ${chanName} in guild ${guild.name}...`);
     mailChannel = await guild.channels.create({
       name: chanName,
       type: ChannelType.GuildText,
@@ -167,20 +165,14 @@ async function forwardModReplyToUser(message: Message): Promise<void> {
   await message.react(sent ? "✅" : "❌").catch(() => {});
 }
 
-// ── DM handler (called from index.ts MessageCreate for non-guild messages) ────
+// ── DM handler (called from raw event in index.ts) ────────────────────────────
 export async function handleDirectMessage(message: Message | PartialMessage): Promise<void> {
-  // Fetch partial messages so author/content are available
   const msg = message.partial ? await message.fetch().catch(() => null) : message;
-  if (!msg) { console.warn("[modmail] DM: fetch returned null"); return; }
-  if (!msg.author) { console.warn("[modmail] DM: no author on message"); return; }
-  if (msg.author.bot) return;
+  if (!msg || !msg.author || msg.author.bot) return;
   if (msg.guild) return;
-
-  console.log(`[modmail] DM received from ${msg.author.tag} — scanning ${msg.client.guilds.cache.size} guild(s)`);
 
   for (const guild of msg.client.guilds.cache.values()) {
     const config = await getGuildConfig(guild.id).catch(() => null);
-    console.log(`[modmail]   guild=${guild.name} modMailChannelId="${config?.modMailChannelId}"`);
     if (config?.modMailChannelId) {
       await forwardDmToMod(msg as Message, guild).catch((err) => {
         console.error("[modmail] forwardDmToMod error:", err);
@@ -188,8 +180,6 @@ export async function handleDirectMessage(message: Message | PartialMessage): Pr
       return;
     }
   }
-
-  console.warn("[modmail] No guild has modMailChannelId configured — DM not forwarded");
 }
 
 // ── Guild message handler: forward mod replies in mail- channels ──────────────
