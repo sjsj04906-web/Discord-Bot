@@ -14,6 +14,11 @@ import { handleVoiceStateUpdate } from "./events/voiceLog.js";
 import { handleWelcome } from "./events/welcome.js";
 import { handleReactionAdd, handleReactionRemove } from "./events/reactionRoles.js";
 import { initInviteTracker, handleInviteCreate, handleInviteDelete, handleInviteJoin } from "./events/inviteTracker.js";
+import {
+  handleChannelCreate, handleChannelDelete, handleChannelUpdate,
+  handleRoleCreate, handleRoleDelete, handleRoleUpdate,
+  handleAdminMemberUpdate, handleGuildUpdate,
+} from "./events/adminLog.js";
 import { startServerStatsScheduler } from "./commands/serverstats.js";
 import { printBanner, log } from "./display.js";
 import { startStatusRotation } from "./statusRotation.js";
@@ -233,6 +238,7 @@ export function startBot(): void {
 
   client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     await handleDehoist(newMember);
+    await handleAdminMemberUpdate(oldMember, newMember);
     if (oldMember.partial || newMember.partial) return;
     await handleMemberUpdate(oldMember, newMember);
   });
@@ -247,6 +253,41 @@ export function startBot(): void {
 
   client.on(Events.MessageReactionRemove, async (reaction, user) => {
     await handleReactionRemove(reaction, user);
+  });
+
+  // ── Admin log events ─────────────────────────────────────────────────────────
+  client.on(Events.ChannelCreate, async (channel) => {
+    if (channel.isDMBased()) return;
+    await handleChannelCreate(channel as import("discord.js").GuildChannel);
+  });
+
+  client.on(Events.ChannelDelete, async (channel) => {
+    if (channel.isDMBased()) return;
+    await handleChannelDelete(channel as import("discord.js").GuildChannel);
+  });
+
+  client.on(Events.ChannelUpdate, async (oldChannel, newChannel) => {
+    if (oldChannel.isDMBased() || newChannel.isDMBased()) return;
+    await handleChannelUpdate(
+      oldChannel as import("discord.js").GuildChannel,
+      newChannel as import("discord.js").GuildChannel,
+    );
+  });
+
+  client.on(Events.GuildRoleCreate, async (role) => {
+    await handleRoleCreate(role);
+  });
+
+  client.on(Events.GuildRoleDelete, async (role) => {
+    await handleRoleDelete(role);
+  });
+
+  client.on(Events.GuildRoleUpdate, async (oldRole, newRole) => {
+    await handleRoleUpdate(oldRole, newRole);
+  });
+
+  client.on(Events.GuildUpdate, async (oldGuild, newGuild) => {
+    await handleGuildUpdate(oldGuild, newGuild);
   });
 
   client.on(Events.InviteCreate, (invite) => {

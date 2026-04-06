@@ -5,15 +5,23 @@ import {
   type User,
 } from "discord.js";
 import { BOT_NAME } from "./theme.js";
-import { logCase } from "./db.js";
+import { logCase, getGuildConfig } from "./db.js";
 
 const MOD_LOG_NAMES = ["mod-log", "modlog", "mod-logs", "modlogs", "audit-log", "auditlog"];
 
 async function getModLogChannel(guild: Guild): Promise<TextChannel | null> {
-  const channel = guild.channels.cache.find(
+  const config = await getGuildConfig(guild.id).catch(() => null);
+
+  // Use DB-configured channel first
+  if (config?.modLogChannelId) {
+    const ch = guild.channels.cache.get(config.modLogChannelId);
+    if (ch?.isTextBased()) return ch as TextChannel;
+  }
+
+  // Fall back to channel name detection
+  return (guild.channels.cache.find(
     (ch) => MOD_LOG_NAMES.includes(ch.name.toLowerCase()) && ch.isTextBased()
-  ) as TextChannel | undefined;
-  return channel ?? null;
+  ) as TextChannel | undefined) ?? null;
 }
 
 export interface ModLogEntry {
