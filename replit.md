@@ -16,6 +16,22 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 
+## Discord Moderator Bot
+
+The bot runs inside the API server (`artifacts/api-server`) and starts automatically alongside Express.
+
+**Bot files:** `artifacts/api-server/src/bot/`
+- `commands/` — slash command handlers (ban, unban, kick, mute, unmute, warn, warnings, clear)
+- `automod.ts` — auto-moderation (spam, caps, mentions, slurs)
+- `warnings.ts` — in-memory warning store
+- `index.ts` — bot startup / event wiring
+
+**Slash commands:** /ban, /unban, /kick, /mute, /unmute, /warn, /warnings, /clear
+
+**Required secret:** `DISCORD_BOT_TOKEN`
+
+**Required bot intents:** Guilds, GuildMembers, GuildMessages, MessageContent, GuildModeration
+
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages
