@@ -8,3 +8,5 @@ export * from "./cases";
 export * from "./tickets";
 export * from "./temproles";
 export * from "./reactionroles";
+export * from "./rolebackups";
+export * from "./modmailsessions";

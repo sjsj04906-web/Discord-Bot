@@ -8,8 +8,8 @@ import { getCommandRoles, addCommandRole, removeCommandRole, clearCommandRoles }
 import { THEME } from "../theme.js";
 
 export const COMMAND_NAMES = new Set([
-  "antiraid", "automod", "ban", "bulkban", "case", "clear", "exportwarns",
-  "history", "kick", "lock", "mute", "note", "permissions", "poll",
+  "antiraid", "automod", "autorole", "ban", "bulkban", "case", "clear", "exportwarns",
+  "history", "kick", "lock", "modmail", "mute", "note", "permissions", "poll",
   "reactionrole", "removewarn", "report", "role", "serverinfo", "slowmode",
   "stats", "tempban", "tempmute", "temprole", "ticket", "unban", "unlock",
   "unmute", "userinfo", "warn", "warnings", "welcome",

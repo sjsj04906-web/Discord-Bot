@@ -1,5 +1,5 @@
-import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable } from "@workspace/db";
-import { eq, and, desc, count, sql, inArray } from "drizzle-orm";
+import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable, roleBackupsTable, modMailSessionsTable } from "@workspace/db";
+import { eq, and, desc, count, sql, inArray, lt, gt } from "drizzle-orm";
 import type { GuildConfig } from "@workspace/db";
 
 // ─── Warnings ─────────────────────────────────────────────────────────────────
@@ -254,6 +254,9 @@ export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
     maxNewlines: 8,
     welcomeChannelId: "",
     welcomeMessage: "",
+    autoRoleIds: "",
+    warnExpiryDays: 0,
+    modMailChannelId: "",
   };
 
   await db.insert(guildConfigTable).values(defaults).onConflictDoNothing();
@@ -341,4 +344,75 @@ export async function getReactionRole(guildId: string, messageId: string, emoji:
     and(eq(reactionRolesTable.guildId, guildId), eq(reactionRolesTable.messageId, messageId), eq(reactionRolesTable.emoji, emoji))
   );
   return rows[0] ?? null;
+}
+
+// ─── Role backups ─────────────────────────────────────────────────────────────
+export async function saveRoleBackup(guildId: string, userId: string, roleIds: string[]): Promise<void> {
+  const roleStr = roleIds.join(",");
+  const existing = await db.select().from(roleBackupsTable).where(
+    and(eq(roleBackupsTable.guildId, guildId), eq(roleBackupsTable.userId, userId))
+  );
+  if (existing.length > 0) {
+    await db.update(roleBackupsTable).set({ roleIds: roleStr, updatedAt: new Date() }).where(
+      and(eq(roleBackupsTable.guildId, guildId), eq(roleBackupsTable.userId, userId))
+    );
+  } else {
+    await db.insert(roleBackupsTable).values({ guildId, userId, roleIds: roleStr });
+  }
+}
+
+export async function getRoleBackup(guildId: string, userId: string): Promise<string[]> {
+  const rows = await db.select().from(roleBackupsTable).where(
+    and(eq(roleBackupsTable.guildId, guildId), eq(roleBackupsTable.userId, userId))
+  );
+  if (!rows[0]?.roleIds) return [];
+  return rows[0].roleIds.split(",").filter(Boolean);
+}
+
+export async function deleteRoleBackup(guildId: string, userId: string): Promise<void> {
+  await db.delete(roleBackupsTable).where(
+    and(eq(roleBackupsTable.guildId, guildId), eq(roleBackupsTable.userId, userId))
+  );
+}
+
+// ─── Mod mail sessions ────────────────────────────────────────────────────────
+export async function openModMailSession(guildId: string, userId: string, userTag: string, channelId: string): Promise<void> {
+  await db.insert(modMailSessionsTable).values({ guildId, userId, userTag, channelId, status: "open" });
+}
+
+export async function closeModMailSession(id: number): Promise<void> {
+  await db.update(modMailSessionsTable).set({ status: "closed" }).where(eq(modMailSessionsTable.id, id));
+}
+
+export async function getModMailSessionByUser(guildId: string, userId: string) {
+  const rows = await db.select().from(modMailSessionsTable).where(
+    and(eq(modMailSessionsTable.guildId, guildId), eq(modMailSessionsTable.userId, userId), eq(modMailSessionsTable.status, "open"))
+  );
+  return rows[0] ?? null;
+}
+
+export async function getModMailSessionByChannel(channelId: string) {
+  const rows = await db.select().from(modMailSessionsTable).where(eq(modMailSessionsTable.channelId, channelId));
+  return rows[0] ?? null;
+}
+
+// ─── Warn expiry ──────────────────────────────────────────────────────────────
+export async function getGuildsWithWarnExpiry(): Promise<{ guildId: string; warnExpiryDays: number }[]> {
+  const rows = await db.select({
+    guildId: guildConfigTable.guildId,
+    warnExpiryDays: guildConfigTable.warnExpiryDays,
+  }).from(guildConfigTable).where(gt(guildConfigTable.warnExpiryDays, 0));
+  return rows;
+}
+
+export async function deleteExpiredWarnings(guildId: string, days: number): Promise<number> {
+  const cutoff = new Date(Date.now() - days * 86_400_000);
+  const rows = await db.select({ id: warningsTable.id }).from(warningsTable).where(
+    and(eq(warningsTable.guildId, guildId), lt(warningsTable.createdAt, cutoff))
+  );
+  if (rows.length === 0) return 0;
+  await db.delete(warningsTable).where(
+    and(eq(warningsTable.guildId, guildId), lt(warningsTable.createdAt, cutoff))
+  );
+  return rows.length;
 }

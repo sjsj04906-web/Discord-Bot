@@ -35,6 +35,8 @@ import * as ticket from "./ticket.js";
 import * as temprole from "./temprole.js";
 import * as reactionrole from "./reactionrole.js";
 import * as exportwarns from "./exportwarns.js";
+import * as autorole from "./autorole.js";
+import * as modmailcmd from "./modmailcmd.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -50,4 +52,5 @@ export const allCommands: SlashCommand[] = [
   automodconfig, permissions,
   history, report, stats, antiraid,
   caseCmd, welcome, ticket, temprole, reactionrole, exportwarns,
+  autorole, modmailcmd,
 ];

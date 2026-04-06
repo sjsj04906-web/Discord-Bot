@@ -5,7 +5,11 @@ import { handleAutoMod } from "./automod.js";
 import { handleMessageDelete, handleMessageUpdate } from "./events/messageLog.js";
 import { handleHarassmentDetection } from "./harassment.js";
 import { handleAntiRaid } from "./events/antiRaid.js";
-import { handleNewAccount, handleDehoist } from "./events/memberJoin.js";
+import { handleNewAccount, handleDehoist, handleAutoRole, handleRoleRestore } from "./events/memberJoin.js";
+import { handleMemberLeave } from "./events/memberLeave.js";
+import { handleMemberUpdate } from "./events/memberUpdate.js";
+import { handleAntiGhostping } from "./events/antiGhostping.js";
+import { handleDirectMessage, handleModMailReply } from "./events/modmail.js";
 import { handleVoiceStateUpdate } from "./events/voiceLog.js";
 import { handleWelcome } from "./events/welcome.js";
 import { handleReactionAdd, handleReactionRemove } from "./events/reactionRoles.js";
@@ -13,6 +17,7 @@ import { printBanner, log } from "./display.js";
 import { startStatusRotation } from "./statusRotation.js";
 import { restorePendingTempBans } from "./tempbanScheduler.js";
 import { restorePendingTempRoles } from "./temproleScheduler.js";
+import { startWarnExpiryScheduler } from "./warnExpiryScheduler.js";
 import { getCommandRoles } from "./db.js";
 import { logger } from "../lib/logger.js";
 
@@ -41,6 +46,7 @@ export function startBot(): void {
     startStatusRotation(readyClient);
     await restorePendingTempBans(readyClient);
     await restorePendingTempRoles(readyClient);
+    startWarnExpiryScheduler();
   });
 
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
@@ -86,11 +92,22 @@ export function startBot(): void {
   });
 
   client.on(Events.MessageCreate, async (message) => {
+    // ── Mod mail: DM forwarding ──────────────────────────────────────────────
+    if (!message.guild) {
+      await handleDirectMessage(message);
+      return;
+    }
+
+    // ── Mod mail: mod-channel reply forwarding ───────────────────────────────
+    await handleModMailReply(message);
+
+    // ── Normal guild message processing ─────────────────────────────────────
     await handleAutoMod(message);
     await handleHarassmentDetection(message);
   });
 
   client.on(Events.MessageDelete, async (message) => {
+    await handleAntiGhostping(message);
     await handleMessageDelete(message);
   });
 
@@ -104,10 +121,20 @@ export function startBot(): void {
     await handleNewAccount(member);
     await handleDehoist(member);
     await handleWelcome(member);
+    await handleRoleRestore(member);
+    await handleAutoRole(member);
   });
 
-  client.on(Events.GuildMemberUpdate, async (_old, newMember) => {
+  client.on(Events.GuildMemberRemove, async (member) => {
+    log.leave(member.user.tag, member.guild.name);
+    if (member.partial) return;
+    await handleMemberLeave(member);
+  });
+
+  client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
     await handleDehoist(newMember);
+    if (oldMember.partial || newMember.partial) return;
+    await handleMemberUpdate(oldMember, newMember);
   });
 
   client.on(Events.VoiceStateUpdate, async (oldState, newState) => {

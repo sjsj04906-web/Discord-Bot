@@ -101,6 +101,9 @@ export const log = {
   join(user: string, guild: string): void {
     row("👾", "CONNECT", c.green, `${c.cyan.bold(user)} ${c.dim("→")} ${c.dim(guild)}`);
   },
+  leave(user: string, guild: string): void {
+    row("🚪", "DISCONNECT", c.dim, `${c.cyan.bold(user)} ${c.dim("←")} ${c.dim(guild)}`);
+  },
   command(name: string, user: string, guild: string): void {
     row("⌘ ", `/${name}`, c.dim, `${c.dim("by")} ${c.cyan(user)} ${c.dim("in")} ${c.dim(guild)}`);
   },

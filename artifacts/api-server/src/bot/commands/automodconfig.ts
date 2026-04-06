@@ -60,6 +60,14 @@ export const data = new SlashCommandBuilder()
       .setDescription("Toggle auto-mod exemption for the current channel")
   )
 
+  .addSubcommand((sub) =>
+    sub.setName("warnexpiry")
+      .setDescription("Set how many days before old warnings are automatically removed (0 = never)")
+      .addIntegerOption((o) =>
+        o.setName("days").setDescription("Days until warnings expire (0 = never)").setRequired(true).setMinValue(0).setMaxValue(365)
+      )
+  )
+
   .addSubcommandGroup((group) =>
     group.setName("words")
       .setDescription("Manage the custom banned word list")
@@ -141,6 +149,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   const config = await getGuildConfig(interaction.guild.id);
+
+  // ── Warn expiry ─────────────────────────────────────────────────────────────
+  if (sub === "warnexpiry") {
+    const days = interaction.options.getInteger("days", true);
+    await updateGuildConfig(interaction.guild.id, { warnExpiryDays: days });
+    const msg = days === 0
+      ? "✅ Warning expiry disabled — warnings will never be automatically removed."
+      : `✅ Warnings older than **${days} day${days === 1 ? "" : "s"}** will be automatically removed (checked every 6 hours).`;
+    await interaction.reply({ content: msg, ephemeral: true });
+    return;
+  }
 
   // ── Status ──────────────────────────────────────────────────────────────────
   if (sub === "status") {

@@ -9,6 +9,9 @@ import { addWarning, countWarnings } from "../db.js";
 import { sendModLog } from "../modlog.js";
 import { THEME, BOT_NAME } from "../theme.js";
 
+// Mirror of ESCALATION thresholds from automod.ts
+const MUTE_THRESHOLD = 5;
+
 export const data = new SlashCommandBuilder()
   .setName("warn")
   .setDescription("Issue a warning to a member")
@@ -41,20 +44,26 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     dmStatus = "\n> ⚠️ Could not DM this user — their direct messages are closed.";
   }
 
+  // ── Proximity notice (one away from auto-mute) ────────────────────────────
+  const proximityNote = total === MUTE_THRESHOLD - 1
+    ? `\n> ⚡ **Heads up:** ${target.username} is **1 warning away** from the automatic ${MUTE_THRESHOLD}-warning mute threshold.`
+    : "";
+
   const embed = new EmbedBuilder()
-    .setColor(THEME.warn)
+    .setColor(total >= MUTE_THRESHOLD - 1 ? THEME.escalate : THEME.warn)
     .setTitle("⚠️ // VIOLATION LOGGED")
     .setThumbnail(target.displayAvatarURL())
     .addFields(
       { name: "TARGET",    value: `${target} \`${target.tag}\``, inline: true },
       { name: "OPERATOR",  value: `${interaction.user}`, inline: true },
-      { name: "WARNING #", value: String(total), inline: true },
+      { name: "WARNING #", value: `${total}${total === MUTE_THRESHOLD - 1 ? " ⚡" : ""}`, inline: true },
       { name: "REASON",    value: reason },
     )
     .setFooter({ text: `ID: ${target.id}${dmStatus ? " • DM failed" : " • User notified via DM"}` })
     .setTimestamp();
 
-  await interaction.reply({ embeds: [embed], content: dmStatus || undefined });
+  const content = [dmStatus, proximityNote].filter(Boolean).join("\n") || undefined;
+  await interaction.reply({ embeds: [embed], content });
   log.warn(target.tag, interaction.guild.name, total, reason);
 
   await sendModLog(interaction.guild, {
@@ -63,6 +72,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     target,
     moderator: interaction.user,
     reason,
-    extra: { "TOTAL WARNINGS": String(total) },
+    extra: {
+      "TOTAL WARNINGS": `${total}${total === MUTE_THRESHOLD - 1 ? " ⚡ (1 away from auto-mute)" : ""}`,
+    },
   });
 }

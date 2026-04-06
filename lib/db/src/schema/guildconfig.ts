@@ -19,6 +19,9 @@ export const guildConfigTable = pgTable("guild_config", {
   maxNewlines:        integer("max_newlines").default(8).notNull(),
   welcomeChannelId:   text("welcome_channel_id").default("").notNull(),
   welcomeMessage:     text("welcome_message").default("").notNull(),
+  autoRoleIds:        text("auto_role_ids").default("").notNull(),
+  warnExpiryDays:     integer("warn_expiry_days").default(0).notNull(),
+  modMailChannelId:   text("mod_mail_channel_id").default("").notNull(),
 });
 
 export const insertGuildConfigSchema = createInsertSchema(guildConfigTable);
