@@ -7,12 +7,13 @@ import {
 import { getCommandRoles, addCommandRole, removeCommandRole, clearCommandRoles } from "../db.js";
 import { THEME } from "../theme.js";
 
-const COMMAND_NAMES = [
-  "antiraid", "automod", "ban", "clear", "history", "kick", "lock", "mute", "note",
-  "permissions", "poll", "removewarn", "report", "role", "serverinfo",
-  "slowmode", "stats", "tempban", "unban", "unlock", "unmute",
-  "userinfo", "warn", "warnings",
-].sort();
+export const COMMAND_NAMES = new Set([
+  "antiraid", "automod", "ban", "bulkban", "case", "clear", "exportwarns",
+  "history", "kick", "lock", "mute", "note", "permissions", "poll",
+  "reactionrole", "removewarn", "report", "role", "serverinfo", "slowmode",
+  "stats", "tempban", "tempmute", "temprole", "ticket", "unban", "unlock",
+  "unmute", "userinfo", "warn", "warnings", "welcome",
+]);
 
 export const data = new SlashCommandBuilder()
   .setName("permissions")
@@ -21,45 +22,42 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub.setName("view")
       .setDescription("See which roles are allowed to use a command")
-      .addStringOption((o) => {
-        const opt = o.setName("command").setDescription("Command to check").setRequired(true);
-        for (const name of COMMAND_NAMES) opt.addChoices({ name: `/${name}`, value: name });
-        return opt;
-      })
+      .addStringOption((o) =>
+        o.setName("command").setDescription("Command name (e.g. ban, kick, warn)").setRequired(true)
+      )
   )
   .addSubcommand((sub) =>
     sub.setName("add")
       .setDescription("Allow a role to use a command")
-      .addStringOption((o) => {
-        const opt = o.setName("command").setDescription("Command to restrict").setRequired(true);
-        for (const name of COMMAND_NAMES) opt.addChoices({ name: `/${name}`, value: name });
-        return opt;
-      })
+      .addStringOption((o) =>
+        o.setName("command").setDescription("Command name (e.g. ban, kick, warn)").setRequired(true)
+      )
       .addRoleOption((o) => o.setName("role").setDescription("Role to allow").setRequired(true))
   )
   .addSubcommand((sub) =>
     sub.setName("remove")
       .setDescription("Remove a role from a command's allowed list")
-      .addStringOption((o) => {
-        const opt = o.setName("command").setDescription("Command to update").setRequired(true);
-        for (const name of COMMAND_NAMES) opt.addChoices({ name: `/${name}`, value: name });
-        return opt;
-      })
+      .addStringOption((o) =>
+        o.setName("command").setDescription("Command name (e.g. ban, kick, warn)").setRequired(true)
+      )
       .addRoleOption((o) => o.setName("role").setDescription("Role to remove").setRequired(true))
   )
   .addSubcommand((sub) =>
     sub.setName("clear")
-      .setDescription("Remove all role restrictions from a command (anyone with default perms can use it)")
-      .addStringOption((o) => {
-        const opt = o.setName("command").setDescription("Command to clear").setRequired(true);
-        for (const name of COMMAND_NAMES) opt.addChoices({ name: `/${name}`, value: name });
-        return opt;
-      })
+      .setDescription("Remove all role restrictions from a command")
+      .addStringOption((o) =>
+        o.setName("command").setDescription("Command name (e.g. ban, kick, warn)").setRequired(true)
+      )
   )
   .addSubcommand((sub) =>
     sub.setName("list")
       .setDescription("Show all commands that have role restrictions configured")
   );
+
+function validateCommand(name: string): string | null {
+  const lower = name.toLowerCase().replace(/^\//, "");
+  return COMMAND_NAMES.has(lower) ? lower : null;
+}
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   if (!interaction.guild) {
@@ -70,9 +68,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const sub = interaction.options.getSubcommand();
 
   if (sub === "view") {
-    const cmdName = interaction.options.getString("command", true);
-    const roles = await getCommandRoles(interaction.guild.id, cmdName);
+    const raw = interaction.options.getString("command", true);
+    const cmdName = validateCommand(raw);
+    if (!cmdName) {
+      await interaction.reply({ content: `Unknown command \`${raw}\`. Use \`/permissions list\` to see all commands.`, ephemeral: true });
+      return;
+    }
 
+    const roles = await getCommandRoles(interaction.guild.id, cmdName);
     const embed = new EmbedBuilder()
       .setColor(THEME.info)
       .setTitle(`🔑 // PERMISSIONS: /${cmdName}`)
@@ -90,7 +93,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   if (sub === "add") {
-    const cmdName = interaction.options.getString("command", true);
+    const raw = interaction.options.getString("command", true);
+    const cmdName = validateCommand(raw);
+    if (!cmdName) {
+      await interaction.reply({ content: `Unknown command \`${raw}\`.`, ephemeral: true });
+      return;
+    }
+
     const role = interaction.options.getRole("role", true);
     const ok = await addCommandRole(interaction.guild.id, cmdName, role.id, interaction.user.tag);
 
@@ -116,7 +125,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   if (sub === "remove") {
-    const cmdName = interaction.options.getString("command", true);
+    const raw = interaction.options.getString("command", true);
+    const cmdName = validateCommand(raw);
+    if (!cmdName) {
+      await interaction.reply({ content: `Unknown command \`${raw}\`.`, ephemeral: true });
+      return;
+    }
+
     const role = interaction.options.getRole("role", true);
     const ok = await removeCommandRole(interaction.guild.id, cmdName, role.id);
 
@@ -142,7 +157,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   if (sub === "clear") {
-    const cmdName = interaction.options.getString("command", true);
+    const raw = interaction.options.getString("command", true);
+    const cmdName = validateCommand(raw);
+    if (!cmdName) {
+      await interaction.reply({ content: `Unknown command \`${raw}\`.`, ephemeral: true });
+      return;
+    }
+
     await clearCommandRoles(interaction.guild.id, cmdName);
     await interaction.reply({
       content: `✅ All role restrictions cleared for \`/${cmdName}\`. Default Discord permissions apply again.`,
@@ -152,17 +173,21 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   if (sub === "list") {
-    const all = await getAllCommandPerms(interaction.guild.id);
+    const map = new Map<string, string[]>();
+    for (const name of COMMAND_NAMES) {
+      const roles = await getCommandRoles(interaction.guild.id, name);
+      if (roles.length > 0) map.set(name, roles);
+    }
 
     const embed = new EmbedBuilder()
       .setColor(THEME.info)
       .setTitle("🔑 // COMMAND PERMISSIONS")
       .setTimestamp();
 
-    if (all.size === 0) {
+    if (map.size === 0) {
       embed.setDescription("No custom role restrictions configured. All commands use their default Discord permissions.");
     } else {
-      for (const [cmd, roles] of all.entries()) {
+      for (const [cmd, roles] of map.entries()) {
         embed.addFields({
           name: `/${cmd}`,
           value: roles.map((r) => `<@&${r}>`).join(", "),
@@ -171,15 +196,5 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     }
 
     await interaction.reply({ embeds: [embed], ephemeral: true });
-    return;
   }
-}
-
-async function getAllCommandPerms(guildId: string): Promise<Map<string, string[]>> {
-  const map = new Map<string, string[]>();
-  for (const name of COMMAND_NAMES) {
-    const roles = await getCommandRoles(guildId, name);
-    if (roles.length > 0) map.set(name, roles);
-  }
-  return map;
 }

@@ -27,6 +27,14 @@ import * as history from "./history.js";
 import * as report from "./report.js";
 import * as stats from "./stats.js";
 import * as antiraid from "./antiraid.js";
+import * as tempmute from "./tempmute.js";
+import * as bulkban from "./bulkban.js";
+import * as caseCmd from "./case.js";
+import * as welcome from "./welcome.js";
+import * as ticket from "./ticket.js";
+import * as temprole from "./temprole.js";
+import * as reactionrole from "./reactionrole.js";
+import * as exportwarns from "./exportwarns.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -34,11 +42,12 @@ export interface SlashCommand {
 }
 
 export const allCommands: SlashCommand[] = [
-  ban, unban, kick, mute, unmute,
-  warn, warningsCmd, removewarn, clear,
+  ban, unban, kick, mute, unmute, tempmute,
+  warn, warningsCmd, removewarn, clear, bulkban,
   slowmode, lock, unlock,
   userinfo, serverinfo,
   tempban, note, poll, role,
   automodconfig, permissions,
   history, report, stats, antiraid,
+  caseCmd, welcome, ticket, temprole, reactionrole, exportwarns,
 ];

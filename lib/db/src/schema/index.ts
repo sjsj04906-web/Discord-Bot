@@ -5,3 +5,6 @@ export * from "./guildconfig";
 export * from "./wordfilter";
 export * from "./commandperms";
 export * from "./cases";
+export * from "./tickets";
+export * from "./temproles";
+export * from "./reactionroles";

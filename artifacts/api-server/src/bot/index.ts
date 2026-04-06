@@ -6,9 +6,13 @@ import { handleMessageDelete, handleMessageUpdate } from "./events/messageLog.js
 import { handleHarassmentDetection } from "./harassment.js";
 import { handleAntiRaid } from "./events/antiRaid.js";
 import { handleNewAccount, handleDehoist } from "./events/memberJoin.js";
+import { handleVoiceStateUpdate } from "./events/voiceLog.js";
+import { handleWelcome } from "./events/welcome.js";
+import { handleReactionAdd, handleReactionRemove } from "./events/reactionRoles.js";
 import { printBanner, log } from "./display.js";
 import { startStatusRotation } from "./statusRotation.js";
 import { restorePendingTempBans } from "./tempbanScheduler.js";
+import { restorePendingTempRoles } from "./temproleScheduler.js";
 import { getCommandRoles } from "./db.js";
 import { logger } from "../lib/logger.js";
 
@@ -36,6 +40,7 @@ export function startBot(): void {
 
     startStatusRotation(readyClient);
     await restorePendingTempBans(readyClient);
+    await restorePendingTempRoles(readyClient);
   });
 
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
@@ -98,10 +103,23 @@ export function startBot(): void {
     await handleAntiRaid(member);
     await handleNewAccount(member);
     await handleDehoist(member);
+    await handleWelcome(member);
   });
 
   client.on(Events.GuildMemberUpdate, async (_old, newMember) => {
     await handleDehoist(newMember);
+  });
+
+  client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+    await handleVoiceStateUpdate(oldState, newState);
+  });
+
+  client.on(Events.MessageReactionAdd, async (reaction, user) => {
+    await handleReactionAdd(reaction, user);
+  });
+
+  client.on(Events.MessageReactionRemove, async (reaction, user) => {
+    await handleReactionRemove(reaction, user);
   });
 
   client.on(Events.Error, (err) => {

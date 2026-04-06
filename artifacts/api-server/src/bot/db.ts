@@ -1,4 +1,4 @@
-import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable } from "@workspace/db";
+import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable } from "@workspace/db";
 import { eq, and, desc, count, sql, inArray } from "drizzle-orm";
 import type { GuildConfig } from "@workspace/db";
 
@@ -60,6 +60,19 @@ export async function clearNotes(guildId: string, userId: string) {
   await db.delete(notesTable).where(
     and(eq(notesTable.guildId, guildId), eq(notesTable.userId, userId))
   );
+}
+
+export async function removeNote(id: number, guildId: string): Promise<boolean> {
+  const rows = await db.select().from(notesTable).where(
+    and(eq(notesTable.id, id), eq(notesTable.guildId, guildId))
+  );
+  if (rows.length === 0) return false;
+  await db.delete(notesTable).where(eq(notesTable.id, id));
+  return true;
+}
+
+export async function getAllWarnings(guildId: string) {
+  return db.select().from(warningsTable).where(eq(warningsTable.guildId, guildId)).orderBy(desc(warningsTable.createdAt));
 }
 
 // ─── Temp bans ────────────────────────────────────────────────────────────────
@@ -132,6 +145,15 @@ export async function logCase(
     .values({ guildId, actionType, targetId, targetTag, moderatorId, moderatorTag, reason, extra })
     .returning({ id: casesTable.id });
   return rows[0]!.id;
+}
+
+export async function getCase(id: number, guildId: string) {
+  const rows = await db.select().from(casesTable).where(and(eq(casesTable.id, id), eq(casesTable.guildId, guildId)));
+  return rows[0] ?? null;
+}
+
+export async function updateCaseReason(id: number, guildId: string, reason: string) {
+  await db.update(casesTable).set({ reason }).where(and(eq(casesTable.id, id), eq(casesTable.guildId, guildId)));
 }
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
@@ -230,6 +252,8 @@ export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
     maxEmojis: 15,
     linkFilterEnabled: false,
     maxNewlines: 8,
+    welcomeChannelId: "",
+    welcomeMessage: "",
   };
 
   await db.insert(guildConfigTable).values(defaults).onConflictDoNothing();
@@ -248,4 +272,73 @@ export async function updateGuildConfig(guildId: string, updates: Partial<Omit<G
 
 export function getExemptChannelIds(config: GuildConfig): string[] {
   return config.exemptChannels ? config.exemptChannels.split(",").map((s) => s.trim()).filter(Boolean) : [];
+}
+
+export async function setWelcomeConfig(guildId: string, updates: { welcomeChannelId?: string; welcomeMessage?: string }) {
+  await updateGuildConfig(guildId, updates);
+}
+
+// ─── Tickets ──────────────────────────────────────────────────────────────────
+export async function openTicket(guildId: string, channelId: string, userId: string, userTag: string, subject: string) {
+  await db.insert(ticketsTable).values({ guildId, channelId, userId, userTag, subject, status: "open" });
+}
+
+export async function closeTicket(id: number) {
+  await db.update(ticketsTable).set({ status: "closed" }).where(eq(ticketsTable.id, id));
+}
+
+export async function getTicketByChannel(channelId: string) {
+  const rows = await db.select().from(ticketsTable).where(and(eq(ticketsTable.channelId, channelId), eq(ticketsTable.status, "open")));
+  return rows[0] ?? null;
+}
+
+// ─── Temp roles ───────────────────────────────────────────────────────────────
+export async function addTempRole(
+  guildId: string, userId: string, userTag: string,
+  roleId: string, roleName: string, expiresAt: Date
+) {
+  const rows = await db
+    .insert(tempRolesTable)
+    .values({ guildId, userId, userTag, roleId, roleName, expiresAt })
+    .returning();
+  return rows[0]!;
+}
+
+export async function getPendingTempRoles() {
+  return db.select().from(tempRolesTable).where(eq(tempRolesTable.removed, false));
+}
+
+export async function markTempRoleRemoved(id: number) {
+  await db.update(tempRolesTable).set({ removed: true }).where(eq(tempRolesTable.id, id));
+}
+
+// ─── Reaction roles ───────────────────────────────────────────────────────────
+export async function addReactionRole(
+  guildId: string, messageId: string, channelId: string,
+  emoji: string, roleId: string, roleName: string
+) {
+  await db.insert(reactionRolesTable).values({ guildId, messageId, channelId, emoji, roleId, roleName })
+    .onConflictDoNothing();
+}
+
+export async function removeReactionRole(guildId: string, messageId: string, emoji: string): Promise<boolean> {
+  const rows = await db.select().from(reactionRolesTable).where(
+    and(eq(reactionRolesTable.guildId, guildId), eq(reactionRolesTable.messageId, messageId), eq(reactionRolesTable.emoji, emoji))
+  );
+  if (rows.length === 0) return false;
+  await db.delete(reactionRolesTable).where(
+    and(eq(reactionRolesTable.guildId, guildId), eq(reactionRolesTable.messageId, messageId), eq(reactionRolesTable.emoji, emoji))
+  );
+  return true;
+}
+
+export async function getReactionRoles(guildId: string) {
+  return db.select().from(reactionRolesTable).where(eq(reactionRolesTable.guildId, guildId));
+}
+
+export async function getReactionRole(guildId: string, messageId: string, emoji: string) {
+  const rows = await db.select().from(reactionRolesTable).where(
+    and(eq(reactionRolesTable.guildId, guildId), eq(reactionRolesTable.messageId, messageId), eq(reactionRolesTable.emoji, emoji))
+  );
+  return rows[0] ?? null;
 }
