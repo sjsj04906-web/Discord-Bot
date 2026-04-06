@@ -182,7 +182,7 @@ export async function handleBlackjackButton(interaction: ButtonInteraction, acti
 
     if (pv > 21) {
       bjGames.delete(userId);
-      await deductBalance(game.guildId, userId, game.bet);
+      // Bet was already deducted at game start — no further deduction needed
       await interaction.update({ embeds: [bjEmbed(game, "bust", game.currencyEmoji)], components: [] });
       return;
     }
@@ -212,17 +212,22 @@ async function resolveStand(interaction: ButtonInteraction, game: BJGame, isAuto
   let status: "win" | "lose" | "push";
   let delta: number;
 
+  // Bet was deducted upfront at game start.
+  // Win:  return original bet + winnings  (bet × 2, or bet + bet×1.5 for natural BJ)
+  // Push: return original bet only
+  // Lose: do nothing — already paid
   if (dv > 21 || pv > dv) {
     status = "win";
-    delta  = isNaturalBJ ? Math.floor(game.bet * 1.5) : game.bet;
+    delta  = isNaturalBJ ? game.bet + Math.floor(game.bet * 1.5) : game.bet * 2;
     await addBalance(game.guildId, game.userId, delta);
   } else if (pv === dv) {
     status = "push";
     delta  = 0;
+    await addBalance(game.guildId, game.userId, game.bet); // refund
   } else {
     status = "lose";
     delta  = -game.bet;
-    await deductBalance(game.guildId, game.userId, game.bet);
+    // No deduction — bet was already taken at game start
   }
 
   const fn = isAutoStand ? interaction.update : interaction.update;
