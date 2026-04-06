@@ -7,6 +7,7 @@ import {
 import { log } from "../display.js";
 import { sendModLog } from "../modlog.js";
 import { THEME, BOT_NAME } from "../theme.js";
+import { randomBanLine } from "../utils/savagelines.js";
 
 export const data = new SlashCommandBuilder()
   .setName("ban")
@@ -51,6 +52,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setAuthor({ name: `⛔  Member Banned  ·  ${BOT_NAME}` })
       .setTitle(target.tag)
       .setURL(`https://discord.com/users/${target.id}`)
+      .setDescription(`*${randomBanLine()}*`)
       .setThumbnail(target.displayAvatarURL())
       .addFields(
         { name: "Member",    value: `${target}`, inline: true },
