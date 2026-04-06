@@ -90,6 +90,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       reason,
       duration: durationLabel,
       extra: { "Expires": `<t:${Math.floor(unbanAt.getTime() / 1000)}:R>` },
+      adminOnly: true,
     });
   } catch (err) {
     await interaction.reply({ content: `Failed to ban member: ${String(err)}`, ephemeral: true });

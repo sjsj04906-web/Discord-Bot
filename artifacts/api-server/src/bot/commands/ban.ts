@@ -76,6 +76,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       moderator: interaction.user,
       reason,
       extra: deleteDays > 0 ? { "Message History Deleted": `${deleteDays} day(s)` } : undefined,
+      adminOnly: true,
     });
   } catch (err) {
     await interaction.reply({ content: `Failed to ban member: ${String(err)}`, ephemeral: true });

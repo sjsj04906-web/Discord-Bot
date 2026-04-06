@@ -75,6 +75,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       moderator: interaction.user,
       reason,
       extra: { "Messages Deleted": `${deleteDays} day(s)` },
+      adminOnly: true,
     });
 
     await logCase(

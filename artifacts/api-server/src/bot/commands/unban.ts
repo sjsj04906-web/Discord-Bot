@@ -55,6 +55,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       target: ban.user,
       moderator: interaction.user,
       reason,
+      adminOnly: true,
     });
   } catch {
     await interaction.reply({ content: `No ban record found for \`${userId}\`.`, ephemeral: true });

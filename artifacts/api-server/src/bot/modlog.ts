@@ -7,7 +7,8 @@ import {
 import { BOT_NAME } from "./theme.js";
 import { logCase, getGuildConfig } from "./db.js";
 
-const MOD_LOG_NAMES = ["mod-log", "modlog", "mod-logs", "modlogs", "audit-log", "auditlog"];
+const MOD_LOG_NAMES   = ["mod-log", "modlog", "mod-logs", "modlogs", "audit-log", "auditlog"];
+const ADMIN_LOG_NAMES = ["admin-log", "adminlog", "server-log", "serverlog", "audit-log", "auditlog"];
 
 async function getModLogChannel(guild: Guild): Promise<TextChannel | null> {
   const config = await getGuildConfig(guild.id).catch(() => null);
@@ -18,7 +19,7 @@ async function getModLogChannel(guild: Guild): Promise<TextChannel | null> {
     if (ch?.isTextBased()) return ch as TextChannel;
   }
 
-  // 2. Fall back to the admin log channel (so ban/kick/warn goes there if no separate mod log is set)
+  // 2. Fall back to the admin log channel
   if (config?.adminLogChannelId) {
     const ch = guild.channels.cache.get(config.adminLogChannelId);
     if (ch?.isTextBased()) return ch as TextChannel;
@@ -27,6 +28,20 @@ async function getModLogChannel(guild: Guild): Promise<TextChannel | null> {
   // 3. Auto-detect by channel name
   return (guild.channels.cache.find(
     (ch) => MOD_LOG_NAMES.includes(ch.name.toLowerCase()) && ch.isTextBased()
+  ) as TextChannel | undefined) ?? null;
+}
+
+async function getAdminLogChannel(guild: Guild): Promise<TextChannel | null> {
+  const config = await getGuildConfig(guild.id).catch(() => null);
+  if (!config?.adminLogEnabled) return null;
+
+  if (config.adminLogChannelId) {
+    const ch = guild.channels.cache.get(config.adminLogChannelId);
+    if (ch?.isTextBased()) return ch as TextChannel;
+  }
+
+  return (guild.channels.cache.find(
+    (ch) => ADMIN_LOG_NAMES.some((n) => ch.name.toLowerCase().includes(n)) && ch.isTextBased()
   ) as TextChannel | undefined) ?? null;
 }
 
@@ -39,6 +54,8 @@ export interface ModLogEntry {
   duration?: string;
   extra?: Record<string, string>;
   skipCase?: boolean;
+  /** Route this entry to the admin log channel instead of the mod log channel */
+  adminOnly?: boolean;
 }
 
 export async function sendModLog(guild: Guild, entry: ModLogEntry): Promise<number | null> {
@@ -57,7 +74,9 @@ export async function sendModLog(guild: Guild, entry: ModLogEntry): Promise<numb
     ).catch(() => null);
   }
 
-  const channel = await getModLogChannel(guild);
+  const channel = entry.adminOnly
+    ? await getAdminLogChannel(guild)
+    : await getModLogChannel(guild);
   if (!channel) return caseId;
 
   const embed = new EmbedBuilder()

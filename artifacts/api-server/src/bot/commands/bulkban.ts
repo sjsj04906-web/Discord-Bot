@@ -107,6 +107,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         "DELETE HISTORY": `${deleteDays} day(s)`,
       },
       skipCase: true,
+      adminOnly: true,
     });
   }
 }
