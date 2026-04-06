@@ -47,7 +47,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const job        = JOBS[Math.floor(Math.random() * JOBS.length)]!;
   const multiplier = 1 + eco.prestige * PRESTIGE_BONUS;
-  const earned     = Math.floor((job.min + Math.random() * (job.max - job.min)) * multiplier);
+  let earned       = Math.floor((job.min + Math.random() * (job.max - job.min)) * multiplier);
+  // Coin Magnet — +50 % yield on /work
+  const hasCoinMagnet = await (await import("./market.js")).hasActiveItem(interaction.guild.id, interaction.user.id, "coin_magnet");
+  if (hasCoinMagnet) earned = Math.floor(earned * 1.5);
 
   await updateLastWork(interaction.guild.id, interaction.user.id);
   const newBal = await addBalance(interaction.guild.id, interaction.user.id, earned);

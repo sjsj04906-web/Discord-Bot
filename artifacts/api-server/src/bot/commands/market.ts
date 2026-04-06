@@ -27,16 +27,22 @@ export const ITEM_CATALOG: MarketListing[] = [
   { id: "data_pack",    name: "Data Pack",        emoji: "💾", description: "Instantly grant 1,000–3,000 bonus coins.", price: 1_000 },
   { id: "exp_injector", name: "EXP Injector",     emoji: "💉", description: "Instantly grant 500–1,500 bonus XP.",     price: 2_000 },
   { id: "daily_reset",  name: "Daily Reset",      emoji: "🔄", description: "Resets your `/daily` cooldown immediately.", price: 5_000 },
-  { id: "fish_lure",    name: "Quantum Lure",     emoji: "🎣", description: "+40% rare fish chance on next 5 casts.",   price: 3_500 },
+  { id: "fish_lure",    name: "Quantum Lure",     emoji: "🎣", description: "Rerolls your next `/fish` cast and keeps the rarer result.", price: 3_500 },
 ];
 
 // ── Daily rotation: 5 deterministic items seeded by date ─────────────────────
+function strHash(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
 export function getTodaysMarket(): MarketListing[] {
   const today = new Date();
   const seed  = today.getUTCFullYear() * 10_000 + (today.getUTCMonth() + 1) * 100 + today.getUTCDate();
   const shuffled = [...ITEM_CATALOG].sort((a, b) => {
-    const ha = ((seed * 9301 + a.id.charCodeAt(0) * 49297) % 233280) / 233280;
-    const hb = ((seed * 9301 + b.id.charCodeAt(0) * 49297) % 233280) / 233280;
+    const ha = ((seed * 9301 + strHash(a.id) * 49297) % 233280) / 233280;
+    const hb = ((seed * 9301 + strHash(b.id) * 49297) % 233280) / 233280;
     return ha - hb;
   });
   return shuffled.slice(0, 5);
@@ -62,7 +68,7 @@ export async function markItemUsed(id: number) {
 }
 
 export async function hasActiveItem(guildId: string, userId: string, itemId: string): Promise<boolean> {
-  const now = new Date();
+  const now  = new Date();
   const rows = await db
     .select()
     .from(marketInventoryTable)
@@ -73,6 +79,16 @@ export async function hasActiveItem(guildId: string, userId: string, itemId: str
       isNull(marketInventoryTable.usedAt),
     ));
   return rows.some((r) => !r.expiresAt || r.expiresAt > now);
+}
+
+// Consume (mark used) the first active instance of an item. Returns true if one was found.
+export async function consumeActiveItem(guildId: string, userId: string, itemId: string): Promise<boolean> {
+  const owned = await getUserInventory(guildId, userId);
+  const now   = new Date();
+  const row   = owned.find((r) => r.itemId === itemId && !r.usedAt && (!r.expiresAt || r.expiresAt > now));
+  if (!row) return false;
+  await markItemUsed(row.id);
+  return true;
 }
 
 // ── Slash command ─────────────────────────────────────────────────────────────

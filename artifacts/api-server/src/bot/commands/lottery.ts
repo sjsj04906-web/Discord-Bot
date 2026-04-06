@@ -5,7 +5,7 @@ import {
 import { THEME, BOT_NAME, SEP } from "../theme.js";
 import { getBalance, deductBalance, addBalance } from "../db.js";
 import { db, lotteryStateTable, lotteryTicketsTable } from "@workspace/db";
-import { eq, and, sum, desc } from "drizzle-orm";
+import { eq, and, sum } from "drizzle-orm";
 
 const TICKET_PRICE    = 500;
 const MAX_TICKETS     = 100;
@@ -199,6 +199,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   // ── /lottery draw (admin) ────────────────────────────────────────────────────
   if (sub === "draw") {
+    const member = await interaction.guild.members.fetch(userId).catch(() => null);
+    if (!member?.permissions.has("Administrator")) {
+      await interaction.reply({
+        embeds: [new EmbedBuilder().setColor(THEME.danger).setDescription(`> ⛔ This command is restricted to server administrators.`)],
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
     await interaction.deferReply();
     const { winnerId, payout } = await drawLottery(guildId);
 
@@ -232,7 +240,6 @@ export async function checkLotteryDraws(client: Client) {
 
       try {
         const guild = await client.guilds.fetch(state.guildId);
-        const guildConfig = await db.select().from(lotteryStateTable).where(eq(lotteryStateTable.guildId, state.guildId));
         const embed = new EmbedBuilder()
           .setColor(THEME.elite as number)
           .setAuthor({ name: `🎰  NEURAL LOTTERY DRAW  ·  ${BOT_NAME}` })

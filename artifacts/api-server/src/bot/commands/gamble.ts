@@ -289,7 +289,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   // ── Coin Flip ────────────────────────────────────────────────────────────────
   if (sub === "coinflip") {
-    const win = Math.random() < 0.5;
+    // Jackpot Chip — guarantees a win (one-use)
+    const hasJackpotChip = await (await import("./market.js")).hasActiveItem(interaction.guild.id, interaction.user.id, "jackpot_chip");
+    const win = hasJackpotChip ? true : Math.random() < 0.5;
+    if (hasJackpotChip) (await import("./market.js")).consumeActiveItem(interaction.guild.id, interaction.user.id, "jackpot_chip").catch(() => {});
     let newBal: number;
     if (win) {
       newBal = await addBalance(interaction.guild.id, interaction.user.id, bet);

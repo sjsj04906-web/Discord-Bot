@@ -91,9 +91,25 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
+  // Rob Shield — target is immune while active
+  const shielded = await (await import("./market.js")).hasActiveItem(interaction.guild.id, target.id, "rob_shield");
+  if (shielded) {
+    await interaction.reply({
+      embeds: [new EmbedBuilder().setColor(THEME.muted)
+        .setAuthor({ name: `🛡️  Rob Shield Active  ·  ${BOT_NAME}` })
+        .setDescription(`> **${target.username}** is running an active Rob Shield — your intrusion was deflected.`)
+        .setFooter({ text: `${BOT_NAME} ◆ Black Market` })],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   await updateLastRob(interaction.guild.id, interaction.user.id);
 
-  const success = Math.random() < SUCCESS_CHANCE;
+  // Lucky Charm — robber gets +25 % success bonus (one-use)
+  const hasLuckyCharm = await (await import("./market.js")).hasActiveItem(interaction.guild.id, interaction.user.id, "lucky_charm");
+  const successChance = SUCCESS_CHANCE + (hasLuckyCharm ? 0.25 : 0);
+  const success = Math.random() < successChance;
 
   if (success) {
     const pct    = STEAL_MIN_PCT + Math.random() * (STEAL_MAX_PCT - STEAL_MIN_PCT);
@@ -105,24 +121,28 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     checkAndAward(interaction.guild.id, interaction.user.id, interaction.channel as never, em).catch(() => {});
     (await import("./quests.js")).incrementQuestProgress(interaction.guild.id, interaction.user.id, "rob_attempt").catch(() => {});
     (await import("./quests.js")).incrementQuestProgress(interaction.guild.id, interaction.user.id, "earn_coins", stolen).catch(() => {});
+    // Consume lucky charm if it was active
+    if (hasLuckyCharm) (await import("./market.js")).consumeActiveItem(interaction.guild.id, interaction.user.id, "lucky_charm").catch(() => {});
     // Bounty claim — if target had a bounty, pay it out to the robber
     const bountyPayout = await (await import("./bounty.js")).claimBounties(interaction.guild.id, target.id, interaction.user.id).catch(() => 0);
 
-    await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(THEME.success)
-          .setAuthor({ name: `🦹  Breach Successful  ·  ${BOT_NAME}` })
-          .setDescription(`> *"${line}"*`)
-          .addFields(
-            { name: "◈ Target",  value: `${target}`,                            inline: true },
-            { name: "◈ Extracted", value: `**+${stolen.toLocaleString()}** ${em}`, inline: true },
-            { name: "◈ Balance", value: `${newBal.toLocaleString()} ${em}`,     inline: true },
-          )
-          .setFooter({ text: `Cooldown: 30 min  ·  ${BOT_NAME} ◆ Economy` })
-          .setTimestamp(),
-      ],
-    });
+    const successEmbed = new EmbedBuilder()
+      .setColor(THEME.success)
+      .setAuthor({ name: `🦹  Breach Successful  ·  ${BOT_NAME}` })
+      .setDescription(`> *"${line}"*`)
+      .addFields(
+        { name: "◈ Target",    value: `${target}`,                               inline: true },
+        { name: "◈ Extracted", value: `**+${stolen.toLocaleString()}** ${em}`,   inline: true },
+        { name: "◈ Balance",   value: `${newBal.toLocaleString()} ${em}`,        inline: true },
+      )
+      .setFooter({ text: `Cooldown: 30 min  ·  ${BOT_NAME} ◆ Economy` })
+      .setTimestamp();
+
+    if (bountyPayout > 0) {
+      successEmbed.addFields({ name: "◈ Bounty Claimed", value: `🎯 **+${bountyPayout.toLocaleString()}** ${em}`, inline: true });
+    }
+
+    await interaction.reply({ embeds: [successEmbed] });
   } else {
     const fine   = Math.max(1, Math.floor(robberEco.balance * FINE_PCT));
     await deductBalance(interaction.guild.id, interaction.user.id, fine);

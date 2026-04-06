@@ -117,6 +117,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       return;
     }
 
+    // Prevent re-posting on the same target (would silently eat the first stake)
+    const existing = await getBountiesOnTarget(guildId, target.id).then((rows) => rows.find((r) => r.posterId === userId));
+    if (existing) {
+      await interaction.reply({ embeds: [new EmbedBuilder().setColor(THEME.warn).setDescription(`> You already have an active bounty on **${target.username}** for 🪙 **${existing.amount.toLocaleString()}** coins.\n> Cancel it first with \`/bounty cancel\` if you want to change the amount.`)], flags: MessageFlags.Ephemeral });
+      return;
+    }
+
     await deductBalance(guildId, userId, amount);
     await postBounty(guildId, userId, target.id, amount);
 
@@ -156,7 +163,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           .setColor(THEME.danger)
           .setAuthor({ name: `🎯  Bounty Board  ·  ${BOT_NAME}` })
           .setDescription(`${SEP}\n${lines.join("\n")}\n${SEP}`)
-          .setFooter({ text: `${bounties.length} active bounty${bounties.length === 1 ? "" : "ies"}  ·  ${BOT_NAME} ◆ Bounty Board` }),
+          .setFooter({ text: `${bounties.length} active ${bounties.length === 1 ? "bounty" : "bounties"}  ·  ${BOT_NAME} ◆ Bounty Board` }),
       ],
     });
     return;

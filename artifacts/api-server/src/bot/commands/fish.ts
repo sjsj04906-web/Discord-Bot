@@ -84,8 +84,23 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const catch_  = pickCatch();
-  const earned  = Math.floor(Math.random() * (catch_.max - catch_.min + 1)) + catch_.min;
+  // Market buffs
+  const { hasActiveItem, consumeActiveItem } = await import("./market.js");
+  const hasFishLure   = await hasActiveItem(interaction.guild.id, interaction.user.id, "fish_lure");
+  const hasCoinMagnet = await hasActiveItem(interaction.guild.id, interaction.user.id, "coin_magnet");
+
+  // Quantum Lure — reroll once and keep the rarer result
+  let catch_ = pickCatch();
+  if (hasFishLure) {
+    const alt = pickCatch();
+    const rarityOrder = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
+    if (rarityOrder.indexOf(alt.rarity) > rarityOrder.indexOf(catch_.rarity)) catch_ = alt;
+    consumeActiveItem(interaction.guild.id, interaction.user.id, "fish_lure").catch(() => {});
+  }
+
+  let earned  = Math.floor(Math.random() * (catch_.max - catch_.min + 1)) + catch_.min;
+  // Coin Magnet — +50 % yield
+  if (hasCoinMagnet) earned = Math.floor(earned * 1.5);
   const isLegend = catch_.rarity === "Legendary";
 
   await incrementFishCount(interaction.guild.id, interaction.user.id);

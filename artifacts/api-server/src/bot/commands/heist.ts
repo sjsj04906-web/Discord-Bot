@@ -192,6 +192,10 @@ async function resolveHeist(interaction: ChatInputCommandInteraction, game: Heis
       }
     } catch {}
   } else {
+    // Still count the attempt toward the heist quest
+    players.forEach((uid) => {
+      import("./quests.js").then((m) => m.incrementQuestProgress(game.guildId, uid, "heist")).catch(() => {});
+    });
     const names = [...game.participants.values()].map((t) => `• ${t}`).join("\n");
     const embed = new EmbedBuilder()
       .setColor(THEME.danger)
