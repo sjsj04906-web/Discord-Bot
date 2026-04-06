@@ -114,6 +114,19 @@ const WARN_LINES = [
   "Keep it up and see what happens. Actually, don't.",
 ];
 
+const FORMAL_WARN_LINES = [
+  "This is an official automated warning. Further violations will result in escalating consequences.",
+  "Your behaviour has been flagged by the moderation system. Please review the server rules immediately.",
+  "This warning has been recorded against your account. Continued infractions will lead to a mute or ban.",
+  "You have reached the formal warning threshold. This is your final notice before automated action is taken.",
+  "The moderation system has issued this warning in response to repeated rule violations. Please act accordingly.",
+  "This is a system-generated formal warning. Your activity is being monitored and further violations will not be tolerated.",
+  "Your account has accumulated enough violations to trigger a formal warning. We expect immediate improvement in conduct.",
+  "This warning is a matter of record. Should you continue to violate the rules, further action will follow automatically.",
+  "The automated moderation system has flagged your account. Please take this warning seriously.",
+  "This formal notice is issued in accordance with server policy. Your next violation may result in a timeout.",
+];
+
 function pick(arr: string[]): string {
   return arr[Math.floor(Math.random() * arr.length)]!;
 }
@@ -121,3 +134,7 @@ function pick(arr: string[]): string {
 export function randomBanLine():  string { return pick(BAN_LINES);  }
 export function randomKickLine(): string { return pick(KICK_LINES); }
 export function randomWarnLine(): string { return pick(WARN_LINES); }
+
+export function randomAutomodWarnLine(): string {
+  return Math.random() < 0.5 ? pick(WARN_LINES) : pick(FORMAL_WARN_LINES);
+}
