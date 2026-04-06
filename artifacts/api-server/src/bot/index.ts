@@ -284,9 +284,11 @@ export function startBot(): void {
       return;
     }
 
-    // ── Auto-responder prompt install (select menu) ───────────────────────────
-    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("ar_prompt_install_")) {
-      const guildId = interaction.customId.replace("ar_prompt_install_", "");
+    // ── Auto-responder prompt install (select menus) ──────────────────────────
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("ar_prompt_")) {
+      const guildId = interaction.customId
+        .replace("ar_prompt_install_", "")
+        .replace("ar_prompt_fun_", "");
       await handlePromptInstall(interaction, guildId);
       return;
     }

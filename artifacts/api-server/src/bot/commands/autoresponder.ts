@@ -134,6 +134,82 @@ export const PROMPT_TEMPLATES: PromptTemplate[] = [
     trigger: "afk", matchType: "contains",
     response: "💤 Going ghost? Don't forget to set your status with `/afk`!",
   },
+  // ── Fun / Random words ───────────────────────────────────────────────────────
+  {
+    id: "bruh", label: "😐  Bruh", category: "Fun",
+    trigger: "bruh", matchType: "exact",
+    response: "bruh.",
+  },
+  {
+    id: "skill_issue", label: "🔧  Skill Issue", category: "Fun",
+    trigger: "skill issue", matchType: "exact",
+    response: "Diagnostic complete: **SKILL ISSUE** confirmed. Recommend running `/work` for remediation.",
+  },
+  {
+    id: "W", label: "🏆  W", category: "Fun",
+    trigger: "W", matchType: "exact",
+    response: "W logged. The grid pays its respects. 🏆",
+  },
+  {
+    id: "L", label: "😔  L", category: "Fun",
+    trigger: "L", matchType: "exact",
+    response: "L detected. Recovery protocol: claim your `/daily` and try again tomorrow.",
+  },
+  {
+    id: "pog", label: "📈  Pog", category: "Fun",
+    trigger: "pog", matchType: "exact",
+    response: "POG. Neural excitement indicators: **elevated**. 📈",
+  },
+  {
+    id: "sus", label: "🔴  Sus", category: "Fun",
+    trigger: "sus", matchType: "exact",
+    response: "🔴 Sus flag raised. Running background scan... *beep boop* ...you're clean, choom. Probably.",
+  },
+  {
+    id: "ratio", label: "📊  Ratio", category: "Fun",
+    trigger: "ratio", matchType: "exact",
+    response: "Ratio attempt registered. Calculating social damage... 📊 Results: **inconclusive**.",
+  },
+  {
+    id: "based", label: "📡  Based", category: "Fun",
+    trigger: "based", matchType: "exact",
+    response: "**Based.** The grid agrees. Logged and verified. 📡",
+  },
+  {
+    id: "no_cap", label: "🧢  No Cap", category: "Fun",
+    trigger: "no cap", matchType: "exact",
+    response: "No cap detected. Honesty protocol: **respected**. Signal verified.",
+  },
+  {
+    id: "sheesh", label: "🌡️  Sheesh", category: "Fun",
+    trigger: "sheesh", matchType: "contains",
+    response: "SHEEEESH. Network temperature: **rising**. 🌡️",
+  },
+  {
+    id: "cope", label: "😤  Cope", category: "Fun",
+    trigger: "cope", matchType: "exact",
+    response: "cope.exe detected. Skill issue identified. Recommend touching grass and re-running.",
+  },
+  {
+    id: "rizz", label: "💅  Rizz", category: "Fun",
+    trigger: "rizz", matchType: "contains",
+    response: "Charisma stat: **off the charts**. The grid is intrigued. 💅",
+  },
+  {
+    id: "vibe_check", label: "✅  Vibe Check", category: "Fun",
+    trigger: "vibe check", matchType: "contains",
+    response: "Vibe scan complete... ✅ Status: **immaculate**.",
+  },
+  {
+    id: "slay", label: "💅  Slay", category: "Fun",
+    trigger: "slay", matchType: "exact",
+    response: "💅 Slay confirmed. The grid bows.",
+  },
+  {
+    id: "mid", label: "😑  Mid", category: "Fun",
+    trigger: "mid", matchType: "exact",
+    response: "Mid detected. The grid has seen better. Have you considered `/prestige`?",
+  },
 ];
 
 const CATEGORY_COLORS: Record<string, number> = {
@@ -286,47 +362,61 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 }
 
+// Split templates into two buckets so neither exceeds Discord's 25-option cap
+const UTILITY_CATS = ["Info", "Economy"];
+const FUN_CATS     = ["Social", "Vibe", "Fun"];
+
+function utilityTemplates() { return PROMPT_TEMPLATES.filter((t) => UTILITY_CATS.includes(t.category)); }
+function funTemplates()     { return PROMPT_TEMPLATES.filter((t) => FUN_CATS.includes(t.category)); }
+
+function buildMenu(
+  templates: PromptTemplate[],
+  customId: string,
+  placeholder: string,
+  active: Set<string>,
+): StringSelectMenuBuilder {
+  return new StringSelectMenuBuilder()
+    .setCustomId(customId)
+    .setPlaceholder(placeholder)
+    .setMinValues(1)
+    .setMaxValues(templates.length)
+    .addOptions(
+      templates.map((t) =>
+        new StringSelectMenuOptionBuilder()
+          .setValue(t.id)
+          .setLabel(t.label.replace(/^\S+\s+/, "").trim().slice(0, 100))
+          .setDescription(`"${t.trigger}" · ${MATCH_LABELS[t.matchType]}`.slice(0, 100))
+          .setEmoji(t.label.match(/^(\S+)/)?.[1] ?? "◈")
+          .setDefault(active.has(t.trigger))
+      )
+    );
+}
+
 // ── Prompts menu ──────────────────────────────────────────────────────────────
 async function showPromptsMenu(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) return;
 
-  const existing    = await getAutoResponders(interaction.guild.id);
+  const existing       = await getAutoResponders(interaction.guild.id);
   const activeTriggers = new Set(existing.map((r) => r.trigger));
+  const gid            = interaction.guild.id;
 
-  const categories = [...new Set(PROMPT_TEMPLATES.map((t) => t.category))];
-
+  const allCats = [...new Set(PROMPT_TEMPLATES.map((t) => t.category))];
   const descLines: string[] = [
-    `Pick one or more prompts from the menu below to install them instantly.`,
-    `Already-active triggers are marked ✅.`,
+    `Pick prompts from either menu below to install them instantly.`,
+    `✅ = already active on this server.`,
     SEP,
   ];
-
-  for (const cat of categories) {
-    const templates = PROMPT_TEMPLATES.filter((t) => t.category === cat);
+  for (const cat of allCats) {
+    const tpls = PROMPT_TEMPLATES.filter((t) => t.category === cat);
     descLines.push(`**${cat}**`);
-    for (const t of templates) {
+    for (const t of tpls) {
       const active = activeTriggers.has(t.trigger);
       descLines.push(`${active ? "✅" : "◈"} ${t.label}  —  \`${t.trigger}\` *(${MATCH_LABELS[t.matchType]})*`);
     }
   }
 
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId(`ar_prompt_install_${interaction.guild.id}`)
-    .setPlaceholder("Select prompts to install…")
-    .setMinValues(1)
-    .setMaxValues(Math.min(PROMPT_TEMPLATES.length, 25))
-    .addOptions(
-      PROMPT_TEMPLATES.map((t) =>
-        new StringSelectMenuOptionBuilder()
-          .setValue(t.id)
-          .setLabel(t.label.replace(/^\S+\s+/, ""))
-          .setDescription(`Trigger: "${t.trigger}" · ${MATCH_LABELS[t.matchType]}`)
-          .setEmoji(t.label.match(/^(\S+)/)?.[1] ?? "◈")
-          .setDefault(activeTriggers.has(t.trigger))
-      )
-    );
-
-  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
+  const utilMenu = buildMenu(utilityTemplates(), `ar_prompt_install_${gid}`, "📋 Utility prompts (Info & Economy)…", activeTriggers);
+  const funMenu  = buildMenu(funTemplates(),     `ar_prompt_fun_${gid}`,     "🎉 Fun & Social prompts…",             activeTriggers);
 
   await interaction.reply({
     embeds: [
@@ -334,9 +424,12 @@ async function showPromptsMenu(interaction: ChatInputCommandInteraction) {
         .setColor(THEME.xp)
         .setAuthor({ name: `🤖  Prompt Library  ·  ${BOT_NAME}` })
         .setDescription(descLines.join("\n"))
-        .setFooter({ text: `${existing.length} / 50 slots used  ·  ${BOT_NAME} ◆ Auto-Responder` }),
+        .setFooter({ text: `${existing.length} / 50 slots used  ·  ${PROMPT_TEMPLATES.length} prompts available  ·  ${BOT_NAME} ◆ Auto-Responder` }),
     ],
-    components: [row],
+    components: [
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(utilMenu),
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(funMenu),
+    ],
     flags: MessageFlags.Ephemeral,
   });
 }
@@ -345,18 +438,18 @@ async function showPromptsMenu(interaction: ChatInputCommandInteraction) {
 export async function handlePromptInstall(interaction: StringSelectMenuInteraction, guildId: string) {
   await interaction.deferUpdate();
 
-  const selected = interaction.values;
-  const templates = PROMPT_TEMPLATES.filter((t) => selected.includes(t.id));
+  const selected   = interaction.values;
+  const templates  = PROMPT_TEMPLATES.filter((t) => selected.includes(t.id));
   if (templates.length === 0) return;
 
-  const existing      = await getAutoResponders(guildId);
+  const existing       = await getAutoResponders(guildId);
   const activeTriggers = new Set(existing.map((r) => r.trigger));
-  const slotsLeft     = 50 - existing.length;
+  const slotsLeft      = 50 - existing.length;
 
   const toInstall   = templates.filter((t) => !activeTriggers.has(t.trigger));
-  const alreadyHave = templates.filter((t) => activeTriggers.has(t.trigger));
+  const alreadyHave = templates.filter((t) =>  activeTriggers.has(t.trigger));
   const truncated   = toInstall.slice(0, slotsLeft);
-  const skipped     = toInstall.slice(slotsLeft);
+  const overflow    = toInstall.slice(slotsLeft);
 
   for (const t of truncated) {
     await addAutoResponder(guildId, t.trigger, t.response, t.matchType);
@@ -366,9 +459,9 @@ export async function handlePromptInstall(interaction: StringSelectMenuInteracti
   const lines: string[] = [];
   if (truncated.length > 0)   lines.push(`**Installed (${truncated.length})**\n` + truncated.map((t) => `✅ ${t.label}  —  \`${t.trigger}\``).join("\n"));
   if (alreadyHave.length > 0) lines.push(`**Already active (${alreadyHave.length})**\n` + alreadyHave.map((t) => `◈ ${t.label}`).join("\n"));
-  if (skipped.length > 0)     lines.push(`**Skipped — no slots (${skipped.length})**\n` + skipped.map((t) => `❌ ${t.label}`).join("\n"));
+  if (overflow.length > 0)    lines.push(`**Skipped — no slots (${overflow.length})**\n` + overflow.map((t) => `❌ ${t.label}`).join("\n"));
 
-  const allNew = await getAutoResponders(guildId);
+  const allNow = await getAutoResponders(guildId);
 
   await interaction.editReply({
     embeds: [
@@ -376,7 +469,7 @@ export async function handlePromptInstall(interaction: StringSelectMenuInteracti
         .setColor(truncated.length > 0 ? THEME.success : THEME.warn)
         .setAuthor({ name: `🤖  Prompts Installed  ·  ${BOT_NAME}` })
         .setDescription(lines.join("\n\n"))
-        .setFooter({ text: `${allNew.length} / 50 slots used  ·  ${BOT_NAME} ◆ Auto-Responder` })
+        .setFooter({ text: `${allNow.length} / 50 slots used  ·  ${BOT_NAME} ◆ Auto-Responder` })
         .setTimestamp(),
     ],
     components: [],
