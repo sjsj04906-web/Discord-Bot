@@ -38,6 +38,7 @@ const DEFAULT_LEVEL_ROLES: Array<{ level: number; name: string; color: number }>
   { level: 125, name: "Cyborg",          color: 0x00FFFF },
   { level: 150, name: "Apex",            color: 0xFF6B35 },
   { level: 200, name: "Architect",       color: 0xF1C40F },
+  { level: 1000, name: "Cyber Psycho",  color: 0xFF0000 },
 ];
 
 export const data = new SlashCommandBuilder()
