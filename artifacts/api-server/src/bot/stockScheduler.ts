@@ -197,6 +197,9 @@ async function processTick(client: Client, guildId: string) {
     await resetVolume24h(guildId);
   }
 
+  // ── Short position fees (once per 2h tick) ────────────────────────────────
+  await processShortFees(guildId);
+
   // ── Earnings reveals ──────────────────────────────────────────────────────
   const pendingEarnings = await getPendingEarnings(guildId);
   for (const earn of pendingEarnings) {
@@ -265,7 +268,6 @@ async function runOrderMatcher(client: Client) {
     try {
       await processOrders(client, guildId);
       await processDarkPool(client, guildId);
-      await processShortFees(guildId);
       await processOptionExpiry(client, guildId);
       await processBondMaturities(client, guildId);
       await processTakeovers(client, guildId);
@@ -297,9 +299,15 @@ async function processOrders(client: Client, guildId: string) {
 
     if (order.side === "buy") {
       await executeBuy(guildId, order.userId, order.ticker, order.shares, price, order.leverage);
+      // Refund the price difference if filled cheaper than the locked limit price
+      const lockedPrice = order.limitPrice ?? price;
+      const lockedCost  = order.leverage ? Math.ceil((order.shares * lockedPrice) / 2) : order.shares * lockedPrice;
+      const fillCost    = order.leverage ? Math.ceil((order.shares * price) / 2) : order.shares * price;
+      const overpaid    = lockedCost - fillCost;
+      if (overpaid > 0) await addBalance(guildId, order.userId, overpaid);
       await fillOrder(order.id, price);
       await notifyUser(client, guildId, order.userId,
-        `✅ Limit buy filled: **${order.shares} ${order.ticker}** @ **${price.toLocaleString()}** coins`);
+        `✅ Limit buy filled: **${order.shares} ${order.ticker}** @ **${price.toLocaleString()}** coins${overpaid > 0 ? ` · **${overpaid.toLocaleString()}** coins refunded` : ""}`);
     } else {
       const holding = await getHolding(guildId, order.userId, order.ticker);
       if (!holding || holding.shares < order.shares) {
@@ -324,14 +332,15 @@ async function processDarkPool(client: Client, guildId: string) {
 
     if (order.side === "buy") {
       await executeBuy(guildId, order.userId, order.ticker, order.shares, fillPrice, false);
+      await deductBalance(guildId, order.userId, fee); // 0.5% dark pool fee
       await fillOrder(order.id, fillPrice);
       await notifyUser(client, guildId, order.userId,
-        `🌑 Dark pool order filled: **${order.shares} ${order.ticker}** @ **${fillPrice.toLocaleString()}** coins (fee deducted: ${fee.toLocaleString()})`);
+        `🌑 Dark pool buy filled: **${order.shares} ${order.ticker}** @ **${fillPrice.toLocaleString()}** coins · Fee: **${fee.toLocaleString()}** coins`);
     } else {
       const holding = await getHolding(guildId, order.userId, order.ticker);
       if (!holding || holding.shares < order.shares) { await cancelOrder(order.id, guildId, order.userId); continue; }
       await executeSell(guildId, order.userId, order.ticker, order.shares, fillPrice);
-      await addBalance(guildId, order.userId, -fee); // deduct dark pool fee
+      await deductBalance(guildId, order.userId, fee); // deduct dark pool fee
       await fillOrder(order.id, fillPrice);
       await notifyUser(client, guildId, order.userId,
         `🌑 Dark pool order filled: **${order.shares} ${order.ticker}** @ **${fillPrice.toLocaleString()}** coins (fee: ${fee.toLocaleString()})`);

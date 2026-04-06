@@ -342,7 +342,7 @@ async function handleBuy(interaction: ChatInputCommandInteraction, guildId: stri
 
   if (dark) {
     const fillsAt = darkPoolFillTime();
-    await addOrder(guildId, userId, ticker, "buy", "dark", shares, undefined, leverage, fillsAt);
+    await addOrder(guildId, userId, ticker, "buy", "dark", shares, state.price, leverage, fillsAt);
     await interaction.editReply({
       embeds: [new EmbedBuilder()
         .setColor(0x2C2C2C)
@@ -575,9 +575,22 @@ async function handleOrders(interaction: ChatInputCommandInteraction, guildId: s
 async function handleCancel(interaction: ChatInputCommandInteraction, guildId: string, userId: string) {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const id = interaction.options.getInteger("id", true);
-  const ok = await cancelOrder(id, guildId, userId);
-  if (!ok) { await interaction.editReply("❌ Order not found or not owned by you."); return; }
-  await interaction.editReply(`✅ Order \`${id}\` cancelled. Funds returned to your wallet.`);
+  const order = await cancelOrder(id, guildId, userId);
+  if (!order) { await interaction.editReply("❌ Order not found or not owned by you."); return; }
+
+  // Refund locked collateral for buy orders (limit or dark pool)
+  let refundMsg = "";
+  if (order.side === "buy") {
+    const totalCost = order.leverage
+      ? Math.ceil((order.shares * (order.limitPrice ?? 0)) / 2)
+      : order.shares * (order.limitPrice ?? 0);
+    if (totalCost > 0) {
+      await addBalance(guildId, userId, totalCost);
+      refundMsg = ` **${totalCost.toLocaleString()}** coins refunded to your wallet.`;
+    }
+  }
+
+  await interaction.editReply(`✅ Order \`${id}\` cancelled.${refundMsg}`);
 }
 
 // ─── /stocks portfolio ────────────────────────────────────────────────────────
@@ -786,7 +799,7 @@ async function handleBots(interaction: ChatInputCommandInteraction, guildId: str
   for (const bot of botDefs) {
     const states = await getBotStates(guildId, bot.id);
     const totalShares = states.reduce((s, x) => s + x.shares, 0);
-    const budget = states[0] ? Number(states[0].cashBudget) : 500_000;
+    const budget = states.reduce((s, x) => s + Number(x.cashBudget), 0);
     const positions = states.filter((s) => s.shares > 0).map((s) => `${s.ticker}×${s.shares}`).join("  ");
     fields.push({
       name: `${bot.emoji} ${bot.name}`,
@@ -992,7 +1005,7 @@ async function handleOptionSell(interaction: ChatInputCommandInteraction, guildI
   // Price at current market
   const currentPremium = optionPremium(state.price, opt.strike, Math.max(1, Math.round(remaining)), baseRate, state.impliedVol, isCall) * opt.lots;
   await addBalance(guildId, userId, currentPremium);
-  await setOptionStatus(opt.id, "expired"); // mark closed
+  await setOptionStatus(opt.id, "closed"); // mark closed (not expired)
 
   const pnl = currentPremium - opt.premium;
   const embed = new EmbedBuilder()

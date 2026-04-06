@@ -183,13 +183,13 @@ export async function getOpenOrders(guildId: string): Promise<StockOrder[]> {
   );
 }
 
-export async function cancelOrder(id: number, guildId: string, userId: string): Promise<boolean> {
+export async function cancelOrder(id: number, guildId: string, userId: string): Promise<StockOrder | null> {
   const rows = await db.select().from(stockOrdersTable).where(
     and(eq(stockOrdersTable.id, id), eq(stockOrdersTable.guildId, guildId), eq(stockOrdersTable.userId, userId), eq(stockOrdersTable.status, "open"))
   );
-  if (!rows[0]) return false;
+  if (!rows[0]) return null;
   await db.update(stockOrdersTable).set({ status: "cancelled" }).where(eq(stockOrdersTable.id, id));
-  return true;
+  return rows[0];
 }
 
 export async function fillOrder(id: number, price: number): Promise<void> {
