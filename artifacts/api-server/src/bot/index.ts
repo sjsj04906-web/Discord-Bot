@@ -17,6 +17,9 @@ import { handleXp } from "./events/xpHandler.js";
 import { handleCounting } from "./events/counting.js";
 import { handleAntiNukeRoleDelete, handleAntiNukeChannelDelete, handleAntiNukeBanAdd } from "./events/antiNuke.js";
 import { handleWelcome } from "./events/welcome.js";
+import { handleBlackjackButton } from "./commands/gamble.js";
+import { getSuggestion, updateSuggestionStatus } from "./db.js";
+import { applySuggestionVerdict } from "./commands/suggestion.js";
 import { handleReactionAdd, handleReactionRemove } from "./events/reactionRoles.js";
 import { initInviteTracker, handleInviteCreate, handleInviteDelete, handleInviteJoin } from "./events/inviteTracker.js";
 import {
@@ -252,6 +255,88 @@ export function startBot(): void {
         .setTimestamp();
 
       await logCh.send({ embeds: [appealEmbed] }).catch(() => {});
+      return;
+    }
+
+    // ── Blackjack buttons ─────────────────────────────────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith("bj_hit_")) {
+      await handleBlackjackButton(interaction, "hit");
+      return;
+    }
+    if (interaction.isButton() && interaction.customId.startsWith("bj_stand_")) {
+      await handleBlackjackButton(interaction, "stand");
+      return;
+    }
+
+    // ── Suggestion approve/deny buttons → show modal ──────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith("suggest_approve_btn_")) {
+      if (!interaction.guild) return;
+      const member = interaction.guild.members.cache.get(interaction.user.id);
+      const isStaff = interaction.guild.ownerId === interaction.user.id
+        || member?.permissions.has(PermissionFlagsBits.ManageGuild);
+      if (!isStaff) {
+        await interaction.reply({ content: "You need **Manage Server** to review suggestions.", flags: MessageFlags.Ephemeral });
+        return;
+      }
+      const id = interaction.customId.replace("suggest_approve_btn_", "");
+      const modal = new ModalBuilder()
+        .setCustomId(`suggest_approve_modal_${id}`)
+        .setTitle(`Approve Suggestion #${id}`)
+        .addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId("reason")
+              .setLabel("Reason (optional)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setMaxLength(300)
+          )
+        );
+      await interaction.showModal(modal);
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith("suggest_deny_btn_")) {
+      if (!interaction.guild) return;
+      const member = interaction.guild.members.cache.get(interaction.user.id);
+      const isStaff = interaction.guild.ownerId === interaction.user.id
+        || member?.permissions.has(PermissionFlagsBits.ManageGuild);
+      if (!isStaff) {
+        await interaction.reply({ content: "You need **Manage Server** to review suggestions.", flags: MessageFlags.Ephemeral });
+        return;
+      }
+      const id = interaction.customId.replace("suggest_deny_btn_", "");
+      const modal = new ModalBuilder()
+        .setCustomId(`suggest_deny_modal_${id}`)
+        .setTitle(`Deny Suggestion #${id}`)
+        .addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(
+            new TextInputBuilder()
+              .setCustomId("reason")
+              .setLabel("Reason (optional)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setMaxLength(300)
+          )
+        );
+      await interaction.showModal(modal);
+      return;
+    }
+
+    // ── Suggestion modals submit ───────────────────────────────────────────────
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("suggest_approve_modal_")) {
+      const id    = Number(interaction.customId.replace("suggest_approve_modal_", ""));
+      const reason = interaction.fields.getTextInputValue("reason");
+      const sugg  = await getSuggestion(id);
+      await applySuggestionVerdict(interaction, sugg, "approve", reason);
+      return;
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("suggest_deny_modal_")) {
+      const id    = Number(interaction.customId.replace("suggest_deny_modal_", ""));
+      const reason = interaction.fields.getTextInputValue("reason");
+      const sugg  = await getSuggestion(id);
+      await applySuggestionVerdict(interaction, sugg, "deny", reason);
       return;
     }
 

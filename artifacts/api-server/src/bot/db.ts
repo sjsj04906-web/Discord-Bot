@@ -1,6 +1,6 @@
-import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable, roleBackupsTable, modMailSessionsTable, remindersTable, xpTable, levelRolesTable } from "@workspace/db";
+import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable, roleBackupsTable, modMailSessionsTable, remindersTable, xpTable, levelRolesTable, suggestionsTable, economyTable, shopTable } from "@workspace/db";
 import { eq, and, desc, count, sql, inArray, lt, gt, lte, asc } from "drizzle-orm";
-import type { GuildConfig } from "@workspace/db";
+import type { GuildConfig, Suggestion, EconomyUser, ShopItem } from "@workspace/db";
 
 // ─── Warnings ─────────────────────────────────────────────────────────────────
 export async function addWarning(guildId: string, userId: string, reason: string, moderatorTag: string) {
@@ -653,4 +653,135 @@ export async function getGuildsWithRetention(): Promise<{ guildId: string; dataR
     guildId: guildConfigTable.guildId,
     dataRetentionDays: guildConfigTable.dataRetentionDays,
   }).from(guildConfigTable).where(gt(guildConfigTable.dataRetentionDays, 0));
+}
+
+// ─── Suggestions ──────────────────────────────────────────────────────────────
+export async function createSuggestion(
+  guildId: string, channelId: string, messageId: string,
+  userId: string, userTag: string, content: string,
+): Promise<number> {
+  const rows = await db.insert(suggestionsTable)
+    .values({ guildId, channelId, messageId, userId, userTag, content })
+    .returning({ id: suggestionsTable.id });
+  return rows[0]!.id;
+}
+
+export async function getSuggestion(id: number): Promise<Suggestion | undefined> {
+  const rows = await db.select().from(suggestionsTable).where(eq(suggestionsTable.id, id));
+  return rows[0];
+}
+
+export async function updateSuggestionStatus(
+  id: number, status: string, reason: string, staffId: string, staffTag: string,
+): Promise<Suggestion | undefined> {
+  const rows = await db.update(suggestionsTable)
+    .set({ status, reason, staffId, staffTag })
+    .where(eq(suggestionsTable.id, id))
+    .returning();
+  return rows[0];
+}
+
+// ─── Economy ──────────────────────────────────────────────────────────────────
+async function ensureEconomyRow(guildId: string, userId: string): Promise<EconomyUser> {
+  const rows = await db.select().from(economyTable)
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
+  if (rows[0]) return rows[0];
+  const inserted = await db.insert(economyTable)
+    .values({ guildId, userId, balance: 0, dailyStreak: 0, totalEarned: 0 })
+    .onConflictDoNothing()
+    .returning();
+  if (inserted[0]) return inserted[0];
+  const retry = await db.select().from(economyTable)
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
+  return retry[0]!;
+}
+
+export async function getBalance(guildId: string, userId: string): Promise<EconomyUser> {
+  return ensureEconomyRow(guildId, userId);
+}
+
+export async function addBalance(guildId: string, userId: string, amount: number): Promise<number> {
+  await ensureEconomyRow(guildId, userId);
+  const rows = await db.update(economyTable)
+    .set({
+      balance:     sql`${economyTable.balance} + ${amount}`,
+      totalEarned: sql`${economyTable.totalEarned} + ${Math.max(0, amount)}`,
+    })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)))
+    .returning({ balance: economyTable.balance });
+  return rows[0]?.balance ?? 0;
+}
+
+export async function deductBalance(guildId: string, userId: string, amount: number): Promise<number> {
+  await ensureEconomyRow(guildId, userId);
+  const rows = await db.update(economyTable)
+    .set({ balance: sql`GREATEST(0, ${economyTable.balance} - ${amount})` })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)))
+    .returning({ balance: economyTable.balance });
+  return rows[0]?.balance ?? 0;
+}
+
+export async function setEconomyBalance(guildId: string, userId: string, amount: number): Promise<void> {
+  await ensureEconomyRow(guildId, userId);
+  await db.update(economyTable)
+    .set({ balance: amount })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
+}
+
+export async function transferBalance(guildId: string, fromId: string, toId: string, amount: number): Promise<void> {
+  await deductBalance(guildId, fromId, amount);
+  await addBalance(guildId, toId, amount);
+}
+
+export async function updateLastDaily(guildId: string, userId: string, streak: number): Promise<void> {
+  await ensureEconomyRow(guildId, userId);
+  await db.update(economyTable)
+    .set({ lastDaily: new Date(), dailyStreak: streak })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
+}
+
+export async function updateLastWork(guildId: string, userId: string): Promise<void> {
+  await ensureEconomyRow(guildId, userId);
+  await db.update(economyTable)
+    .set({ lastWork: new Date() })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)));
+}
+
+export async function getEconomyLeaderboard(guildId: string, limit = 10, offset = 0): Promise<EconomyUser[]> {
+  return db.select().from(economyTable)
+    .where(eq(economyTable.guildId, guildId))
+    .orderBy(desc(economyTable.balance))
+    .limit(limit)
+    .offset(offset);
+}
+
+export async function getEconomyRank(guildId: string, userId: string): Promise<number> {
+  const rows = await db.select({ userId: economyTable.userId })
+    .from(economyTable)
+    .where(eq(economyTable.guildId, guildId))
+    .orderBy(desc(economyTable.balance));
+  const idx = rows.findIndex((r) => r.userId === userId);
+  return idx === -1 ? rows.length + 1 : idx + 1;
+}
+
+// ─── Shop ─────────────────────────────────────────────────────────────────────
+export async function getShopItems(guildId: string): Promise<ShopItem[]> {
+  return db.select().from(shopTable).where(eq(shopTable.guildId, guildId));
+}
+
+export async function addShopItem(
+  guildId: string, name: string, description: string, price: number, roleId: string,
+): Promise<number> {
+  const rows = await db.insert(shopTable)
+    .values({ guildId, name, description, price, roleId })
+    .returning({ id: shopTable.id });
+  return rows[0]!.id;
+}
+
+export async function removeShopItem(id: number, guildId: string): Promise<boolean> {
+  const rows = await db.select().from(shopTable)
+    .where(and(eq(shopTable.id, id), eq(shopTable.guildId, guildId)));
+  if (rows.length === 0) return false;
+  await db.delete(shopTable).where(and(eq(shopTable.id, id), eq(shopTable.guildId, guildId)));
+  return true;
 }

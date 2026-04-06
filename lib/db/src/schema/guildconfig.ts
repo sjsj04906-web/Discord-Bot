@@ -38,6 +38,12 @@ export const guildConfigTable = pgTable("guild_config", {
   antiNukeThreshold:      integer("anti_nuke_threshold").default(3).notNull(),
   antiNukeWindowSecs:     integer("anti_nuke_window_secs").default(10).notNull(),
   altLogChannelId:        text("alt_log_channel_id").default("").notNull(),
+  suggestionChannelId:    text("suggestion_channel_id").default("").notNull(),
+  economyEnabled:         boolean("economy_enabled").default(true).notNull(),
+  currencyName:           text("currency_name").default("coins").notNull(),
+  currencyEmoji:          text("currency_emoji").default("🪙").notNull(),
+  dailyAmount:            integer("daily_amount").default(100).notNull(),
+  workCooldownMins:       integer("work_cooldown_mins").default(60).notNull(),
 });
 
 export const insertGuildConfigSchema = createInsertSchema(guildConfigTable);

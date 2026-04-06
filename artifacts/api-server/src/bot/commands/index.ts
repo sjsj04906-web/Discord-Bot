@@ -53,6 +53,17 @@ import * as rank from "./rank.js";
 import * as leaderboard from "./leaderboard.js";
 import * as leveling from "./leveling.js";
 import * as counting from "./counting.js";
+import * as suggest from "./suggest.js";
+import * as suggestions from "./suggestions.js";
+import * as suggestion from "./suggestion.js";
+import * as balance from "./balance.js";
+import * as daily from "./daily.js";
+import * as work from "./work.js";
+import * as pay from "./pay.js";
+import * as shop from "./shop.js";
+import * as richest from "./richest.js";
+import * as economy from "./economy.js";
+import * as gamble from "./gamble.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -77,4 +88,6 @@ export const allCommands: SlashCommand[] = [
   leaderboard,
   leveling,
   counting,
+  suggest, suggestions, suggestion,
+  balance, daily, work, pay, shop, richest, economy, gamble,
 ];
