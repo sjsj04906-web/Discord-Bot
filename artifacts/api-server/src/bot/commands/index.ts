@@ -21,6 +21,7 @@ import * as note from "./note.js";
 import * as poll from "./poll.js";
 import * as role from "./role.js";
 import * as automodconfig from "./automodconfig.js";
+import * as removewarn from "./removewarn.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -29,7 +30,7 @@ export interface SlashCommand {
 
 export const allCommands: SlashCommand[] = [
   ban, unban, kick, mute, unmute,
-  warn, warningsCmd, clear,
+  warn, warningsCmd, removewarn, clear,
   slowmode, lock, unlock,
   userinfo, serverinfo,
   tempban, note, poll, role,

@@ -26,6 +26,15 @@ export async function clearWarnings(guildId: string, userId: string) {
   );
 }
 
+export async function removeWarning(id: number, guildId: string): Promise<boolean> {
+  const rows = await db.select().from(warningsTable).where(
+    and(eq(warningsTable.id, id), eq(warningsTable.guildId, guildId))
+  );
+  if (rows.length === 0) return false;
+  await db.delete(warningsTable).where(eq(warningsTable.id, id));
+  return true;
+}
+
 // ─── Notes ────────────────────────────────────────────────────────────────────
 export async function addNote(guildId: string, userId: string, note: string, moderatorTag: string) {
   await db.insert(notesTable).values({ guildId, userId, note, moderatorTag });
