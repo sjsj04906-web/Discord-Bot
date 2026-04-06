@@ -20,6 +20,7 @@ import { handleWelcome } from "./events/welcome.js";
 import { handleBlackjackButton } from "./commands/gamble.js";
 import { getSuggestion, updateSuggestionStatus } from "./db.js";
 import { applySuggestionVerdict } from "./commands/suggestion.js";
+import { handleSuggestionMessage } from "./events/suggestions.js";
 import { handleReactionAdd, handleReactionRemove } from "./events/reactionRoles.js";
 import { initInviteTracker, handleInviteCreate, handleInviteDelete, handleInviteJoin } from "./events/inviteTracker.js";
 import {
@@ -402,6 +403,13 @@ export function startBot(): void {
   client.on(Events.MessageCreate, async (message) => {
     // DMs are handled via the raw listener above; only process guild messages here
     if (!message.guildId || !message.guild || message.author.bot) return;
+
+    // ── Suggestion channel: intercept and convert to suggestion embed ─────────
+    const suggConfig = await getGuildConfig(message.guildId).catch(() => null);
+    if (suggConfig?.suggestionChannelId && message.channelId === suggConfig.suggestionChannelId) {
+      await handleSuggestionMessage(message);
+      return;
+    }
 
     // ── AFK: clear status if AFK user sends a message ────────────────────────
     if (isAfk(message.guildId, message.author.id)) {

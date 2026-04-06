@@ -671,6 +671,12 @@ export async function getSuggestion(id: number): Promise<Suggestion | undefined>
   return rows[0];
 }
 
+export async function updateSuggestionMessageId(id: number, messageId: string): Promise<void> {
+  await db.update(suggestionsTable)
+    .set({ messageId })
+    .where(eq(suggestionsTable.id, id));
+}
+
 export async function updateSuggestionStatus(
   id: number, status: string, reason: string, staffId: string, staffTag: string,
 ): Promise<Suggestion | undefined> {

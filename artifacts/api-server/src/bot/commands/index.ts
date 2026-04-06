@@ -53,7 +53,6 @@ import * as rank from "./rank.js";
 import * as leaderboard from "./leaderboard.js";
 import * as leveling from "./leveling.js";
 import * as counting from "./counting.js";
-import * as suggest from "./suggest.js";
 import * as suggestions from "./suggestions.js";
 import * as suggestion from "./suggestion.js";
 import * as balance from "./balance.js";
@@ -88,6 +87,6 @@ export const allCommands: SlashCommand[] = [
   leaderboard,
   leveling,
   counting,
-  suggest, suggestions, suggestion,
+  suggestions, suggestion,
   balance, daily, work, pay, shop, richest, economy, gamble,
 ];

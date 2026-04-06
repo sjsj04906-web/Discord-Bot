@@ -11,7 +11,7 @@ export const data = new SlashCommandBuilder()
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addSubcommand((s) =>
     s.setName("setup")
-      .setDescription("Set the channel where suggestions are posted")
+      .setDescription("Set the channel members post suggestions in (bot auto-converts them)")
       .addChannelOption((o) =>
         o.setName("channel").setDescription("Suggestion channel").setRequired(true)
       )
