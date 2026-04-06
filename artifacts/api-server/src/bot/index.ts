@@ -92,6 +92,9 @@ export function startBot(): void {
   });
 
   client.on(Events.MessageCreate, async (message) => {
+    // Debug: log every single message so we can confirm DMs are received
+    console.log(`[msg] guildId=${message.guildId ?? "null"} channelType=${message.channel?.type ?? "?"} partial=${message.partial} author=${message.author?.tag ?? "?"}`);
+
     // ── Mod mail: DM forwarding ──────────────────────────────────────────────
     if (!message.guildId) {
       await handleDirectMessage(message);
