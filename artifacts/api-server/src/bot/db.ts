@@ -899,10 +899,9 @@ export async function unlockAchievement(
 }
 
 // ─── Bank interest ────────────────────────────────────────────────────────────
-const INTEREST_RATE      = 0.02;
-const INTEREST_INTERVAL  = 24 * 60 * 60 * 1000;
-const INTEREST_MIN_BAL   = 100;
-const INTEREST_MAX_GRANT = 100_000;
+const INTEREST_RATE     = 0.02;
+const INTEREST_INTERVAL = 24 * 60 * 60 * 1000;
+const INTEREST_MIN_BAL  = 100;
 
 export async function applyBankInterest(): Promise<Array<{ guildId: string; userId: string; grant: number }>> {
   const cutoff = new Date(Date.now() - INTEREST_INTERVAL);
@@ -919,7 +918,7 @@ export async function applyBankInterest(): Promise<Array<{ guildId: string; user
 
   const results: Array<{ guildId: string; userId: string; grant: number }> = [];
   for (const row of eligible) {
-    const grant = Math.min(Math.floor(row.bankBalance * INTEREST_RATE), INTEREST_MAX_GRANT);
+    const grant = Math.floor(row.bankBalance * INTEREST_RATE);
     if (grant < 1) continue;
     await db.update(economyTable)
       .set({
