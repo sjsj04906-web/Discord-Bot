@@ -28,7 +28,8 @@ export const guildConfigTable = pgTable("guild_config", {
   adminLogEnabled:     boolean("admin_log_enabled").default(true).notNull(),
   verifyRoleId:          text("verify_role_id").default("").notNull(),
   memberCountChannelId:  text("member_count_channel_id").default("").notNull(),
-  humanCountChannelId:   text("human_count_channel_id").default("").notNull(),
+  humanCountChannelId:    text("human_count_channel_id").default("").notNull(),
+  dataRetentionDays:      integer("data_retention_days").default(365).notNull(),
 });
 
 export const insertGuildConfigSchema = createInsertSchema(guildConfigTable);

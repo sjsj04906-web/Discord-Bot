@@ -423,3 +423,85 @@ export async function deleteExpiredWarnings(guildId: string, days: number): Prom
   );
   return rows.length;
 }
+
+// ─── GDPR: user data retrieval ────────────────────────────────────────────────
+export async function getUserData(guildId: string, userId: string) {
+  const [warnings, notes, cases, tempBans, modmail, roleBackup, tickets] = await Promise.all([
+    db.select().from(warningsTable).where(and(eq(warningsTable.guildId, guildId), eq(warningsTable.userId, userId))).orderBy(desc(warningsTable.createdAt)),
+    db.select().from(notesTable).where(and(eq(notesTable.guildId, guildId), eq(notesTable.userId, userId))).orderBy(desc(notesTable.createdAt)),
+    db.select().from(casesTable).where(and(eq(casesTable.guildId, guildId), eq(casesTable.targetId, userId))).orderBy(desc(casesTable.createdAt)),
+    db.select().from(tempBansTable).where(and(eq(tempBansTable.guildId, guildId), eq(tempBansTable.userId, userId))).orderBy(desc(tempBansTable.createdAt)),
+    db.select().from(modMailSessionsTable).where(and(eq(modMailSessionsTable.guildId, guildId), eq(modMailSessionsTable.userId, userId))).orderBy(desc(modMailSessionsTable.createdAt)),
+    db.select().from(roleBackupsTable).where(and(eq(roleBackupsTable.guildId, guildId), eq(roleBackupsTable.userId, userId))),
+    db.select().from(ticketsTable).where(and(eq(ticketsTable.guildId, guildId), eq(ticketsTable.userId, userId))).orderBy(desc(ticketsTable.createdAt)),
+  ]);
+  return { warnings, notes, cases, tempBans, modmail, roleBackup, tickets };
+}
+
+// ─── GDPR: user data erasure ──────────────────────────────────────────────────
+export async function eraseUserData(guildId: string, userId: string): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+
+  const warn = await db.select({ id: warningsTable.id }).from(warningsTable).where(and(eq(warningsTable.guildId, guildId), eq(warningsTable.userId, userId)));
+  counts.warnings = warn.length;
+  if (warn.length) await db.delete(warningsTable).where(and(eq(warningsTable.guildId, guildId), eq(warningsTable.userId, userId)));
+
+  const note = await db.select({ id: notesTable.id }).from(notesTable).where(and(eq(notesTable.guildId, guildId), eq(notesTable.userId, userId)));
+  counts.notes = note.length;
+  if (note.length) await db.delete(notesTable).where(and(eq(notesTable.guildId, guildId), eq(notesTable.userId, userId)));
+
+  const cas = await db.select({ id: casesTable.id }).from(casesTable).where(and(eq(casesTable.guildId, guildId), eq(casesTable.targetId, userId)));
+  counts.cases = cas.length;
+  if (cas.length) await db.delete(casesTable).where(and(eq(casesTable.guildId, guildId), eq(casesTable.targetId, userId)));
+
+  const tb = await db.select({ id: tempBansTable.id }).from(tempBansTable).where(and(eq(tempBansTable.guildId, guildId), eq(tempBansTable.userId, userId)));
+  counts.tempBans = tb.length;
+  if (tb.length) await db.delete(tempBansTable).where(and(eq(tempBansTable.guildId, guildId), eq(tempBansTable.userId, userId)));
+
+  const mm = await db.select({ id: modMailSessionsTable.id }).from(modMailSessionsTable).where(and(eq(modMailSessionsTable.guildId, guildId), eq(modMailSessionsTable.userId, userId)));
+  counts.modmail = mm.length;
+  if (mm.length) await db.delete(modMailSessionsTable).where(and(eq(modMailSessionsTable.guildId, guildId), eq(modMailSessionsTable.userId, userId)));
+
+  const rb = await db.select({ id: roleBackupsTable.id }).from(roleBackupsTable).where(and(eq(roleBackupsTable.guildId, guildId), eq(roleBackupsTable.userId, userId)));
+  counts.roleBackups = rb.length;
+  if (rb.length) await db.delete(roleBackupsTable).where(and(eq(roleBackupsTable.guildId, guildId), eq(roleBackupsTable.userId, userId)));
+
+  const tk = await db.select({ id: ticketsTable.id }).from(ticketsTable).where(and(eq(ticketsTable.guildId, guildId), eq(ticketsTable.userId, userId)));
+  counts.tickets = tk.length;
+  if (tk.length) await db.delete(ticketsTable).where(and(eq(ticketsTable.guildId, guildId), eq(ticketsTable.userId, userId)));
+
+  return counts;
+}
+
+// ─── GDPR: retention purge ────────────────────────────────────────────────────
+export async function purgeOldRecords(guildId: string, days: number): Promise<number> {
+  const cutoff = new Date(Date.now() - days * 86_400_000);
+  let total = 0;
+
+  const tables = [
+    { tbl: warningsTable,       col: warningsTable.createdAt,       gid: warningsTable.guildId },
+    { tbl: notesTable,          col: notesTable.createdAt,          gid: notesTable.guildId },
+    { tbl: casesTable,          col: casesTable.createdAt,          gid: casesTable.guildId },
+    { tbl: tempBansTable,       col: tempBansTable.createdAt,       gid: tempBansTable.guildId },
+    { tbl: modMailSessionsTable,col: modMailSessionsTable.createdAt, gid: modMailSessionsTable.guildId },
+    { tbl: ticketsTable,        col: ticketsTable.createdAt,        gid: ticketsTable.guildId },
+  ] as const;
+
+  for (const { tbl, col, gid } of tables) {
+    const rows = await (db as any).select({ id: (tbl as any).id }).from(tbl).where(and(eq(gid as any, guildId), lt(col as any, cutoff)));
+    if (rows.length) {
+      await (db as any).delete(tbl).where(and(eq(gid as any, guildId), lt(col as any, cutoff)));
+      total += rows.length;
+    }
+  }
+
+  return total;
+}
+
+// ─── GDPR: all guilds with retention configured ───────────────────────────────
+export async function getGuildsWithRetention(): Promise<{ guildId: string; dataRetentionDays: number }[]> {
+  return db.select({
+    guildId: guildConfigTable.guildId,
+    dataRetentionDays: guildConfigTable.dataRetentionDays,
+  }).from(guildConfigTable).where(gt(guildConfigTable.dataRetentionDays, 0));
+}

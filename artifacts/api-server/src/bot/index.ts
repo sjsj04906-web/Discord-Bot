@@ -25,6 +25,7 @@ import { startStatusRotation } from "./statusRotation.js";
 import { restorePendingTempBans } from "./tempbanScheduler.js";
 import { restorePendingTempRoles } from "./temproleScheduler.js";
 import { startWarnExpiryScheduler } from "./warnExpiryScheduler.js";
+import { startRetentionScheduler } from "./retentionScheduler.js";
 import { getCommandRoles, getGuildConfig } from "./db.js";
 import { clearAfk, getAfk, isAfk } from "./utils/afkStore.js";
 import { logger } from "../lib/logger.js";
@@ -56,6 +57,7 @@ export function startBot(): void {
     await restorePendingTempBans(readyClient);
     await restorePendingTempRoles(readyClient);
     startWarnExpiryScheduler();
+    startRetentionScheduler();
     startServerStatsScheduler(readyClient);
     await initInviteTracker(readyClient);
   });
