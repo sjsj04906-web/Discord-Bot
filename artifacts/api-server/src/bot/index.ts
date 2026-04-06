@@ -1,4 +1,4 @@
-import { Events, type Interaction } from "discord.js";
+import { Events, type Interaction, PermissionFlagsBits } from "discord.js";
 import { client, commands } from "./client.js";
 import { allCommands } from "./commands/index.js";
 import { handleAutoMod } from "./automod.js";
@@ -9,6 +9,7 @@ import { handleNewAccount } from "./events/memberJoin.js";
 import { printBanner, log } from "./display.js";
 import { startStatusRotation } from "./statusRotation.js";
 import { restorePendingTempBans } from "./tempbanScheduler.js";
+import { getCommandRoles } from "./db.js";
 import { logger } from "../lib/logger.js";
 
 export function startBot(): void {
@@ -44,6 +45,27 @@ export function startBot(): void {
     if (!command) return;
 
     log.command(interaction.commandName, interaction.user.tag, interaction.guild?.name ?? "DM");
+
+    // ── Role permission check ────────────────────────────────────────────────
+    if (interaction.guild) {
+      const member = interaction.guild.members.cache.get(interaction.user.id);
+      const isOwner = interaction.guild.ownerId === interaction.user.id;
+      const isAdmin = member?.permissions.has(PermissionFlagsBits.Administrator) ?? false;
+
+      if (!isOwner && !isAdmin) {
+        const allowedRoles = await getCommandRoles(interaction.guild.id, interaction.commandName);
+        if (allowedRoles.length > 0) {
+          const hasRole = member?.roles.cache.some((r) => allowedRoles.includes(r.id)) ?? false;
+          if (!hasRole) {
+            await interaction.reply({
+              content: `🔒 You don't have the required role to use \`/${interaction.commandName}\`.`,
+              ephemeral: true,
+            });
+            return;
+          }
+        }
+      }
+    }
 
     try {
       await command.execute(interaction);

@@ -1,4 +1,4 @@
-import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable } from "@workspace/db";
+import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import type { GuildConfig } from "@workspace/db";
 
@@ -106,6 +106,54 @@ export async function getWordFilter(guildId: string): Promise<string[]> {
 export async function clearWordFilter(guildId: string): Promise<void> {
   await db.delete(wordFilterTable).where(eq(wordFilterTable.guildId, guildId));
   wordFilterCache.delete(guildId);
+}
+
+// ─── Command permissions ──────────────────────────────────────────────────────
+const cmdPermsCache = new Map<string, Map<string, string[]>>();
+
+function cmdCacheKey(guildId: string) { return guildId; }
+
+export async function getCommandRoles(guildId: string, commandName: string): Promise<string[]> {
+  const cached = cmdPermsCache.get(cmdCacheKey(guildId));
+  if (cached) return cached.get(commandName) ?? [];
+
+  const rows = await db.select().from(commandPermsTable).where(eq(commandPermsTable.guildId, guildId));
+  const map = new Map<string, string[]>();
+  for (const row of rows) {
+    if (!map.has(row.commandName)) map.set(row.commandName, []);
+    map.get(row.commandName)!.push(row.roleId);
+  }
+  cmdPermsCache.set(guildId, map);
+  return map.get(commandName) ?? [];
+}
+
+export async function addCommandRole(guildId: string, commandName: string, roleId: string, addedBy: string): Promise<boolean> {
+  const existing = await getCommandRoles(guildId, commandName);
+  if (existing.includes(roleId)) return false;
+  await db.insert(commandPermsTable).values({ guildId, commandName, roleId, addedBy });
+  cmdPermsCache.delete(guildId);
+  return true;
+}
+
+export async function removeCommandRole(guildId: string, commandName: string, roleId: string): Promise<boolean> {
+  const existing = await getCommandRoles(guildId, commandName);
+  if (!existing.includes(roleId)) return false;
+  await db.delete(commandPermsTable).where(
+    and(
+      eq(commandPermsTable.guildId, guildId),
+      eq(commandPermsTable.commandName, commandName),
+      eq(commandPermsTable.roleId, roleId),
+    )
+  );
+  cmdPermsCache.delete(guildId);
+  return true;
+}
+
+export async function clearCommandRoles(guildId: string, commandName: string): Promise<void> {
+  await db.delete(commandPermsTable).where(
+    and(eq(commandPermsTable.guildId, guildId), eq(commandPermsTable.commandName, commandName))
+  );
+  cmdPermsCache.delete(guildId);
 }
 
 // ─── Guild config ─────────────────────────────────────────────────────────────
