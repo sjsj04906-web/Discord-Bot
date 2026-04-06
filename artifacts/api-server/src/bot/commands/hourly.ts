@@ -4,6 +4,7 @@ import {
 } from "discord.js";
 import { THEME, BOT_NAME } from "../theme.js";
 import { getGuildConfig, getBalance, addBalance, updateLastHourly } from "../db.js";
+import { PRESTIGE_BONUS } from "./prestige.js";
 
 const HOURLY_MS = 60 * 60 * 1000;
 const HOURLY_AMOUNT = 50;
@@ -32,8 +33,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
+  const multiplier = 1 + eco.prestige * PRESTIGE_BONUS;
+  const payout     = Math.floor(HOURLY_AMOUNT * multiplier);
+
   await updateLastHourly(interaction.guild.id, interaction.user.id);
-  const newBal = await addBalance(interaction.guild.id, interaction.user.id, HOURLY_AMOUNT);
+  const newBal = await addBalance(interaction.guild.id, interaction.user.id, payout);
 
   await interaction.reply({
     embeds: [
@@ -42,8 +46,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         .setAuthor({ name: `⚡  Hourly Reward  ·  ${BOT_NAME}` })
         .setDescription(`You jacked into the grid and snagged your hourly payout.`)
         .addFields(
-          { name: "Earned",      value: `+${HOURLY_AMOUNT} ${em}`, inline: true },
-          { name: "New Balance", value: `${newBal.toLocaleString()} ${em}`, inline: true },
+          { name: "Earned",      value: `+${payout} ${em}`,                    inline: true },
+          { name: "New Balance", value: `${newBal.toLocaleString()} ${em}`,     inline: true },
         )
         .setFooter({ text: `Next hourly available in 1 hour` })
         .setTimestamp(),

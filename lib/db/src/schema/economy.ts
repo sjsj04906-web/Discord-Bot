@@ -18,6 +18,7 @@ export const economyTable = pgTable("economy", {
   robSuccesses: integer("rob_successes").default(0).notNull(),
   bjWins:       integer("bj_wins").default(0).notNull(),
   heistCount:   integer("heist_count").default(0).notNull(),
+  prestige:     integer("prestige").default(0).notNull(),
 }, (t) => ({ uniq: unique().on(t.guildId, t.userId) }));
 
 export const userAchievementsTable = pgTable("user_achievements", {

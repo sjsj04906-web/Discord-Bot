@@ -4,6 +4,7 @@ import {
 } from "discord.js";
 import { THEME, BOT_NAME } from "../theme.js";
 import { getGuildConfig, getBalance, getEconomyRank } from "../db.js";
+import { prestigeBadge } from "./prestige.js";
 
 export const data = new SlashCommandBuilder()
   .setName("balance")
@@ -24,7 +25,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     embeds: [
       new EmbedBuilder()
         .setColor(0xFFD700)
-        .setAuthor({ name: `${em}  ${target.username}'s Balance  ·  ${BOT_NAME}` })
+        .setAuthor({ name: `${em}  ${prestigeBadge(eco.prestige)}${target.username}'s Balance  ·  ${BOT_NAME}` })
         .setThumbnail(target.displayAvatarURL())
         .addFields(
           { name: "👜 Wallet",    value: `**${eco.balance.toLocaleString()}** ${em}`,     inline: true },
@@ -33,6 +34,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           { name: "Total Earned", value: `${eco.totalEarned.toLocaleString()} ${em}`,     inline: true },
           { name: "Server Rank",  value: `#${rank}`,                                      inline: true },
           { name: "Daily Streak", value: `🔥 ${eco.dailyStreak} day${eco.dailyStreak !== 1 ? "s" : ""}`, inline: true },
+          { name: "Prestige",     value: eco.prestige > 0 ? `${prestigeBadge(eco.prestige)}Level ${eco.prestige}` : "None", inline: true },
         )
         .setFooter({ text: `${BOT_NAME}  ·  Economy  ·  Bank is safe from /rob` })
         .setTimestamp(),

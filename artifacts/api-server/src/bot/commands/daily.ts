@@ -5,6 +5,7 @@ import {
 import { THEME, BOT_NAME } from "../theme.js";
 import { getGuildConfig, getBalance, addBalance, updateLastDaily } from "../db.js";
 import { checkAndAward } from "../lib/achievements.js";
+import { PRESTIGE_BONUS } from "./prestige.js";
 
 const DAILY_MS = 20 * 60 * 60 * 1000;
 const STREAK_RESET_MS = 48 * 60 * 60 * 1000;
@@ -42,8 +43,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     streak = 1;
   }
 
-  const bonus = Math.floor(base * 0.1 * Math.min(streak - 1, 10));
-  const total = base + bonus;
+  const bonus        = Math.floor(base * 0.1 * Math.min(streak - 1, 10));
+  const prestigeMult = 1 + eco.prestige * PRESTIGE_BONUS;
+  const total        = Math.floor((base + bonus) * prestigeMult);
 
   await updateLastDaily(interaction.guild.id, interaction.user.id, streak);
   const newBal = await addBalance(interaction.guild.id, interaction.user.id, total);

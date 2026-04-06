@@ -69,6 +69,9 @@ import * as bank from "./bank.js";
 import * as fish from "./fish.js";
 import * as heist from "./heist.js";
 import * as achievements from "./achievements.js";
+import * as autoresponder from "./autoresponder.js";
+import * as duel from "./duel.js";
+import * as prestige from "./prestige.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -95,6 +98,7 @@ export const allCommands: SlashCommand[] = [
   counting,
   suggestions, suggestion,
   balance, daily, hourly, work, pay, shop, richest, economy, gamble,
-  rob, bank, fish, heist,
-  achievements,
+  rob, bank, fish, heist, duel,
+  achievements, prestige,
+  autoresponder,
 ];

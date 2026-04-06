@@ -4,6 +4,7 @@ import {
 } from "discord.js";
 import { THEME, BOT_NAME } from "../theme.js";
 import { getGuildConfig, getBalance, addBalance, updateLastWork } from "../db.js";
+import { prestigeBadge, PRESTIGE_BONUS } from "./prestige.js";
 
 const JOBS = [
   { label: "hacked a server",          min: 30, max: 90  },
@@ -44,18 +45,20 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const job = JOBS[Math.floor(Math.random() * JOBS.length)]!;
-  const earned = Math.floor(job.min + Math.random() * (job.max - job.min));
+  const job        = JOBS[Math.floor(Math.random() * JOBS.length)]!;
+  const multiplier = 1 + eco.prestige * PRESTIGE_BONUS;
+  const earned     = Math.floor((job.min + Math.random() * (job.max - job.min)) * multiplier);
 
   await updateLastWork(interaction.guild.id, interaction.user.id);
   const newBal = await addBalance(interaction.guild.id, interaction.user.id, earned);
+  const badge  = prestigeBadge(eco.prestige);
 
   await interaction.reply({
     embeds: [
       new EmbedBuilder()
         .setColor(0x00ff88)
         .setAuthor({ name: `💻  Work Complete  ·  ${BOT_NAME}` })
-        .setDescription(`> You ${job.label} and earned **+${earned} ${em}**`)
+        .setDescription(`> You ${job.label} and earned **+${earned} ${em}**${eco.prestige > 0 ? `\n> *${badge}Prestige ${eco.prestige} bonus applied*` : ""}`)
         .addFields(
           { name: "New Balance", value: `${newBal.toLocaleString()} ${em}`, inline: true },
           { name: "Cooldown",    value: `${config.workCooldownMins} min`,    inline: true },

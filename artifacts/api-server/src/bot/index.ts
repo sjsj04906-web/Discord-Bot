@@ -21,6 +21,8 @@ import { handleAntiNukeRoleDelete, handleAntiNukeChannelDelete, handleAntiNukeBa
 import { handleWelcome } from "./events/welcome.js";
 import { handleBlackjackButton } from "./commands/gamble.js";
 import { handleHeistJoin } from "./commands/heist.js";
+import { handleDuelButton } from "./commands/duel.js";
+import { handleAutoResponder } from "./events/autoresponder.js";
 import { getSuggestion, updateSuggestionStatus } from "./db.js";
 import { applySuggestionVerdict } from "./commands/suggestion.js";
 import { handleSuggestionMessage, handleSuggestionThread } from "./events/suggestions.js";
@@ -281,6 +283,16 @@ export function startBot(): void {
       return;
     }
 
+    // ── Duel accept/decline buttons ───────────────────────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith("duel_")) {
+      const parts  = interaction.customId.split("_");
+      const action = parts[1] as "accept" | "decline";
+      const guildId      = parts[2]!;
+      const challengerId = parts[3]!;
+      await handleDuelButton(interaction, action, guildId, challengerId);
+      return;
+    }
+
     // ── Suggestion approve/deny buttons → show modal ──────────────────────────
     if (interaction.isButton() && interaction.customId.startsWith("suggest_approve_btn_")) {
       if (!interaction.guild) return;
@@ -461,6 +473,9 @@ export function startBot(): void {
 
     // ── Mod mail: mod-channel reply forwarding ───────────────────────────────
     await handleModMailReply(message);
+
+    // ── Auto-responder ───────────────────────────────────────────────────────
+    await handleAutoResponder(message);
 
     // ── Normal guild message processing ─────────────────────────────────────
     await handleAutoMod(message);

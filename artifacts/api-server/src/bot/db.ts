@@ -1,6 +1,6 @@
-import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable, roleBackupsTable, modMailSessionsTable, remindersTable, xpTable, levelRolesTable, suggestionsTable, economyTable, shopTable, userAchievementsTable } from "@workspace/db";
+import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable, roleBackupsTable, modMailSessionsTable, remindersTable, xpTable, levelRolesTable, suggestionsTable, economyTable, shopTable, userAchievementsTable, autoRespondersTable } from "@workspace/db";
 import { eq, and, desc, count, sql, inArray, lt, gt, lte, asc, isNull, or } from "drizzle-orm";
-import type { GuildConfig, Suggestion, EconomyUser, ShopItem } from "@workspace/db";
+import type { GuildConfig, Suggestion, EconomyUser, ShopItem, AutoResponder } from "@workspace/db";
 
 // ─── Warnings ─────────────────────────────────────────────────────────────────
 export async function addWarning(guildId: string, userId: string, reason: string, moderatorTag: string) {
@@ -843,6 +843,49 @@ export async function removeShopItem(id: number, guildId: string): Promise<boole
   if (rows.length === 0) return false;
   await db.delete(shopTable).where(and(eq(shopTable.id, id), eq(shopTable.guildId, guildId)));
   return true;
+}
+
+// ─── Auto-responders ──────────────────────────────────────────────────────────
+export async function getAutoResponders(guildId: string): Promise<AutoResponder[]> {
+  return db.select().from(autoRespondersTable)
+    .where(eq(autoRespondersTable.guildId, guildId))
+    .orderBy(asc(autoRespondersTable.id));
+}
+
+export async function addAutoResponder(
+  guildId: string, trigger: string, response: string, matchType: string,
+): Promise<void> {
+  await db.insert(autoRespondersTable)
+    .values({ guildId, trigger, response, matchType })
+    .onConflictDoUpdate({
+      target: [autoRespondersTable.guildId, autoRespondersTable.trigger],
+      set:    { response, matchType },
+    });
+}
+
+export async function removeAutoResponder(guildId: string, trigger: string): Promise<boolean> {
+  const rows = await db.select({ id: autoRespondersTable.id })
+    .from(autoRespondersTable)
+    .where(and(eq(autoRespondersTable.guildId, guildId), eq(autoRespondersTable.trigger, trigger)));
+  if (rows.length === 0) return false;
+  await db.delete(autoRespondersTable)
+    .where(and(eq(autoRespondersTable.guildId, guildId), eq(autoRespondersTable.trigger, trigger)));
+  return true;
+}
+
+// ─── Prestige ─────────────────────────────────────────────────────────────────
+export async function incrementPrestige(
+  guildId: string, userId: string,
+): Promise<{ newBalance: number; prestige: number }> {
+  await ensureEconomyRow(guildId, userId);
+  const rows = await db.update(economyTable)
+    .set({
+      balance:  0,
+      prestige: sql`${economyTable.prestige} + 1`,
+    })
+    .where(and(eq(economyTable.guildId, guildId), eq(economyTable.userId, userId)))
+    .returning({ newBalance: economyTable.balance, prestige: economyTable.prestige });
+  return rows[0] ?? { newBalance: 0, prestige: 1 };
 }
 
 // ─── Economy counters ─────────────────────────────────────────────────────────

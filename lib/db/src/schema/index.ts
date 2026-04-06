@@ -15,3 +15,4 @@ export * from "./xp";
 export * from "./counting";
 export * from "./suggestions";
 export * from "./economy";
+export * from "./autoresponders";
