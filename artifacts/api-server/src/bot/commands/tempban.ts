@@ -47,10 +47,20 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  const member = interaction.guild.members.cache.get(target.id);
+  const member = interaction.guild.members.cache.get(target.id)
+    ?? await interaction.guild.members.fetch(target.id).catch(() => null);
+
   if (member && !member.bannable) {
     await interaction.reply({ content: "I don't have permission to ban this member.", ephemeral: true });
     return;
+  }
+
+  // Strip all non-@everyone roles before banning
+  const strippedRoles: string[] = [];
+  if (member) {
+    const roles = member.roles.cache.filter((r) => r.id !== interaction.guild!.id);
+    strippedRoles.push(...roles.map((r) => `<@&${r.id}>`));
+    await member.roles.set([], `Pre-ban role strip — banned by ${interaction.user.tag}`).catch(() => {});
   }
 
   const unbanAt = new Date(Date.now() + durationSecs * 1000);
@@ -75,9 +85,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         { name: "Duration",  value: durationLabel, inline: true },
         { name: "Expires",   value: `<t:${Math.floor(unbanAt.getTime() / 1000)}:R>`, inline: true },
         { name: "Reason",    value: reason },
-      )
-      .setFooter({ text: `ID: ${target.id}` })
-      .setTimestamp();
+      );
+
+    if (strippedRoles.length > 0) {
+      embed.addFields({ name: "Roles Stripped", value: strippedRoles.join(" ") });
+    }
+
+    embed.setFooter({ text: `ID: ${target.id}` }).setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
     log.ban(target.tag, interaction.guild.name, `Temp ${durationLabel} — ${reason}`);

@@ -35,10 +35,20 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  const member = interaction.guild.members.cache.get(target.id);
+  const member = interaction.guild.members.cache.get(target.id)
+    ?? await interaction.guild.members.fetch(target.id).catch(() => null);
+
   if (member && !member.bannable) {
     await interaction.reply({ content: "I don't have permission to ban this member.", ephemeral: true });
     return;
+  }
+
+  // Strip all non-@everyone roles before banning
+  const strippedRoles: string[] = [];
+  if (member) {
+    const roles = member.roles.cache.filter((r) => r.id !== interaction.guild!.id);
+    strippedRoles.push(...roles.map((r) => `<@&${r.id}>`));
+    await member.roles.set([], `Pre-ban role strip — banned by ${interaction.user.tag}`).catch(() => {});
   }
 
   try {
@@ -58,13 +68,16 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         { name: "Member",    value: `${target}`, inline: true },
         { name: "Moderator", value: `${interaction.user}`, inline: true },
       )
-      .addFields({ name: "Reason", value: reason })
-      .setFooter({ text: `ID: ${target.id}` })
-      .setTimestamp();
+      .addFields({ name: "Reason", value: reason });
 
+    if (strippedRoles.length > 0) {
+      embed.addFields({ name: "Roles Stripped", value: strippedRoles.join(" ") });
+    }
     if (deleteDays > 0) {
       embed.addFields({ name: "Message History", value: `${deleteDays} day(s) deleted`, inline: true });
     }
+
+    embed.setFooter({ text: `ID: ${target.id}` }).setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
     log.ban(target.tag, interaction.guild.name, reason);
