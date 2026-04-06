@@ -12,13 +12,19 @@ const MOD_LOG_NAMES = ["mod-log", "modlog", "mod-logs", "modlogs", "audit-log", 
 async function getModLogChannel(guild: Guild): Promise<TextChannel | null> {
   const config = await getGuildConfig(guild.id).catch(() => null);
 
-  // Use DB-configured channel first
+  // 1. Dedicated mod log channel
   if (config?.modLogChannelId) {
     const ch = guild.channels.cache.get(config.modLogChannelId);
     if (ch?.isTextBased()) return ch as TextChannel;
   }
 
-  // Fall back to channel name detection
+  // 2. Fall back to the admin log channel (so ban/kick/warn goes there if no separate mod log is set)
+  if (config?.adminLogChannelId) {
+    const ch = guild.channels.cache.get(config.adminLogChannelId);
+    if (ch?.isTextBased()) return ch as TextChannel;
+  }
+
+  // 3. Auto-detect by channel name
   return (guild.channels.cache.find(
     (ch) => MOD_LOG_NAMES.includes(ch.name.toLowerCase()) && ch.isTextBased()
   ) as TextChannel | undefined) ?? null;
