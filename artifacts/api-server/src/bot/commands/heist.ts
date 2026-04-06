@@ -86,6 +86,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     resolved:     false,
   };
   heistGames.set(interaction.guild.id, game);
+  await incrementHeistCount(interaction.guild.id, interaction.user.id);
+  checkAndAward(interaction.guild.id, interaction.user.id, interaction.channel as never, em).catch(() => {});
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()

@@ -336,6 +336,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   // ── Slots ────────────────────────────────────────────────────────────────────
   if (sub === "slots") {
     const reels    = [spinReel(), spinReel(), spinReel()];
+    // Jackpot Chip — force a triple match (guarantees a win)
+    const hasJackpotChipSlots = await (await import("./market.js")).hasActiveItem(interaction.guild.id, interaction.user.id, "jackpot_chip");
+    if (hasJackpotChipSlots) {
+      reels[1] = reels[0]!;
+      reels[2] = reels[0]!;
+      (await import("./market.js")).consumeActiveItem(interaction.guild.id, interaction.user.id, "jackpot_chip").catch(() => {});
+    }
     const { multiplier, label } = calcSlotPayout(reels, bet);
     let delta: number;
     let newBal: number;
@@ -376,7 +383,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const resultColor = roll === 0 ? "green" : RED_NUMS.has(roll) ? "red" : "black";
     const colorEmoji  = { red: "🔴", black: "⚫", green: "🟢" }[resultColor];
     const multipliers = { red: 2, black: 2, green: 14 };
-    const win         = choice === resultColor;
+    // Jackpot Chip — force the spin to land on the chosen color
+    const hasJackpotChipRoulette = await (await import("./market.js")).hasActiveItem(interaction.guild.id, interaction.user.id, "jackpot_chip");
+    const win = choice === resultColor || hasJackpotChipRoulette;
+    if (hasJackpotChipRoulette) (await import("./market.js")).consumeActiveItem(interaction.guild.id, interaction.user.id, "jackpot_chip").catch(() => {});
     let newBal: number;
     let delta: number;
     if (win) {

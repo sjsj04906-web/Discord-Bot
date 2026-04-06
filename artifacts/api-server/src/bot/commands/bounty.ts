@@ -112,8 +112,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     }
 
     const bal = await getBalance(guildId, userId);
-    if (bal < amount) {
-      await interaction.reply({ embeds: [new EmbedBuilder().setColor(THEME.danger).setDescription(`> You need **${amount.toLocaleString()}** coins. You have **${bal.toLocaleString()}**.`)], flags: MessageFlags.Ephemeral });
+    if (bal.balance < amount) {
+      await interaction.reply({ embeds: [new EmbedBuilder().setColor(THEME.danger).setDescription(`> You need **${amount.toLocaleString()}** coins. You have **${bal.balance.toLocaleString()}**.`)], flags: MessageFlags.Ephemeral });
       return;
     }
 
