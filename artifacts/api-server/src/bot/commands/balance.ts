@@ -2,9 +2,9 @@ import {
   SlashCommandBuilder, EmbedBuilder,
   MessageFlags, type ChatInputCommandInteraction,
 } from "discord.js";
-import { THEME, BOT_NAME } from "../theme.js";
+import { BOT_NAME } from "../theme.js";
 import { getGuildConfig, getBalance, getEconomyRank } from "../db.js";
-import { prestigeBadge } from "./prestige.js";
+import { getPrestigeInfo, MAX_PRESTIGE, PRESTIGE_REQ } from "./prestige.js";
 
 export const data = new SlashCommandBuilder()
   .setName("balance")
@@ -15,17 +15,29 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) return;
   const target = interaction.options.getUser("user") ?? interaction.user;
   const config = await getGuildConfig(interaction.guild.id);
-  const eco = await getBalance(interaction.guild.id, target.id);
-  const rank = await getEconomyRank(interaction.guild.id, target.id);
-  const em = config.currencyEmoji;
-  const name = config.currencyName;
+  const eco    = await getBalance(interaction.guild.id, target.id);
+  const rank   = await getEconomyRank(interaction.guild.id, target.id);
+  const em     = config.currencyEmoji;
+  const name   = config.currencyName;
 
-  const netWorth = eco.balance + eco.bankBalance;
+  const prestige  = getPrestigeInfo(eco.prestige);
+  const netWorth  = eco.balance + eco.bankBalance;
+  const embedColor = eco.prestige > 0 ? prestige.color : 0xFFD700;
+
+  const prestigeValue = eco.prestige === 0
+    ? `None — ${PRESTIGE_REQ.toLocaleString()} ${em} to ascend`
+    : eco.prestige >= MAX_PRESTIGE
+      ? `${prestige.badge} **${prestige.title}** *(MAX)*`
+      : `${prestige.badge} **${prestige.title}** *(Level ${eco.prestige})*`;
+
   await interaction.reply({
     embeds: [
       new EmbedBuilder()
-        .setColor(0xFFD700)
-        .setAuthor({ name: `${em}  ${prestigeBadge(eco.prestige)}${target.username}'s Balance  ·  ${BOT_NAME}` })
+        .setColor(embedColor)
+        .setAuthor({
+          name:    `${em}  ${eco.prestige > 0 ? `[${prestige.badge} ${prestige.title}]  ` : ""}${target.username}'s Balance  ·  ${BOT_NAME}`,
+          iconURL: target.displayAvatarURL(),
+        })
         .setThumbnail(target.displayAvatarURL())
         .addFields(
           { name: "👜 Wallet",    value: `**${eco.balance.toLocaleString()}** ${em}`,     inline: true },
@@ -34,7 +46,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           { name: "Total Earned", value: `${eco.totalEarned.toLocaleString()} ${em}`,     inline: true },
           { name: "Server Rank",  value: `#${rank}`,                                      inline: true },
           { name: "Daily Streak", value: `🔥 ${eco.dailyStreak} day${eco.dailyStreak !== 1 ? "s" : ""}`, inline: true },
-          { name: "Prestige",     value: eco.prestige > 0 ? `${prestigeBadge(eco.prestige)}Level ${eco.prestige}` : "None", inline: true },
+          { name: "✦ Prestige",   value: prestigeValue,                                   inline: false },
         )
         .setFooter({ text: `${BOT_NAME}  ·  Economy  ·  Bank is safe from /rob` })
         .setTimestamp(),
