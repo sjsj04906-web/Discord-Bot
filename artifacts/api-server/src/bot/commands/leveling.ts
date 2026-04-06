@@ -19,13 +19,25 @@ import { levelFromXp } from "../utils/xpMath.js";
 
 // ── Cyberpunk-themed default level roles ─────────────────────────────────────
 const DEFAULT_LEVEL_ROLES: Array<{ level: number; name: string; color: number }> = [
-  { level: 5,   name: "Initiate",       color: 0x5865F2 },
-  { level: 10,  name: "Operative",      color: 0x3BA55D },
-  { level: 20,  name: "Netrunner",      color: 0x9C84EF },
-  { level: 35,  name: "Phantom",        color: 0xEB459E },
-  { level: 50,  name: "Glitch",         color: 0xFEE75C },
-  { level: 75,  name: "Corrupted",      color: 0xED4245 },
-  { level: 100, name: "System Override",color: 0xFFD700 },
+  { level: 1,   name: "Lurker",          color: 0x36393F },
+  { level: 3,   name: "Observer",        color: 0x747F8D },
+  { level: 5,   name: "Initiate",        color: 0x5865F2 },
+  { level: 8,   name: "Recruit",         color: 0x4E9FE5 },
+  { level: 10,  name: "Operative",       color: 0x3BA55D },
+  { level: 15,  name: "Agent",           color: 0x1ABC9C },
+  { level: 20,  name: "Netrunner",       color: 0x9C84EF },
+  { level: 25,  name: "Hacker",          color: 0x7289DA },
+  { level: 30,  name: "Ghost",           color: 0xBCC0C0 },
+  { level: 35,  name: "Phantom",         color: 0xEB459E },
+  { level: 40,  name: "Infiltrator",     color: 0x2ECC71 },
+  { level: 50,  name: "Glitch",          color: 0xFEE75C },
+  { level: 60,  name: "Renegade",        color: 0xE67E22 },
+  { level: 75,  name: "Corrupted",       color: 0xED4245 },
+  { level: 85,  name: "Specter",         color: 0x992D22 },
+  { level: 100, name: "System Override", color: 0xFFD700 },
+  { level: 125, name: "Cyborg",          color: 0x00FFFF },
+  { level: 150, name: "Apex",            color: 0xFF6B35 },
+  { level: 200, name: "Architect",       color: 0xF1C40F },
 ];
 
 export const data = new SlashCommandBuilder()
