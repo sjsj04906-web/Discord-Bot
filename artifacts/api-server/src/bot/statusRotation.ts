@@ -1,21 +1,24 @@
 import { ActivityType, type Client } from "discord.js";
 
 const STATUSES = [
-  { type: ActivityType.Watching,   name: "the network" },
-  { type: ActivityType.Watching,   name: "for violations" },
-  { type: ActivityType.Listening,  name: "transmissions" },
-  { type: ActivityType.Playing,    name: "GL1TCH v2.0" },
-  { type: ActivityType.Watching,   name: "all channels" },
-  { type: ActivityType.Custom,     name: "🛡 AUTOMOD ACTIVE" },
-  { type: ActivityType.Competing,  name: "server security" },
+  "👁 Watching the network",
+  "🛡 Scanning for violations",
+  "📡 Listening to transmissions",
+  "⚡ GL1TCH v2.0 online",
+  "🔒 Guarding all channels",
+  "🛡 AUTOMOD ACTIVE",
+  "🔍 Protecting the network",
+  "💀 Zero tolerance protocol",
 ];
 
 let index = 0;
 
 export function startStatusRotation(client: Client): void {
   const rotate = () => {
-    const status = STATUSES[index % STATUSES.length]!;
-    client.user?.setActivity(status.name, { type: status.type });
+    const text = STATUSES[index % STATUSES.length]!;
+    client.user?.setPresence({
+      activities: [{ name: text, type: ActivityType.Custom, state: text }],
+    });
     index++;
   };
 
