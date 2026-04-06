@@ -20,7 +20,7 @@ import { handleWelcome } from "./events/welcome.js";
 import { handleBlackjackButton } from "./commands/gamble.js";
 import { getSuggestion, updateSuggestionStatus } from "./db.js";
 import { applySuggestionVerdict } from "./commands/suggestion.js";
-import { handleSuggestionMessage } from "./events/suggestions.js";
+import { handleSuggestionMessage, handleSuggestionThread } from "./events/suggestions.js";
 import { handleReactionAdd, handleReactionRemove } from "./events/reactionRoles.js";
 import { initInviteTracker, handleInviteCreate, handleInviteDelete, handleInviteJoin } from "./events/inviteTracker.js";
 import {
@@ -494,6 +494,10 @@ export function startBot(): void {
     await handleAdminMemberUpdate(oldMember, newMember);
     if (oldMember.partial || newMember.partial) return;
     await handleMemberUpdate(oldMember, newMember);
+  });
+
+  client.on(Events.ThreadCreate, async (thread, newlyCreated) => {
+    await handleSuggestionThread(thread, newlyCreated);
   });
 
   client.on(Events.VoiceStateUpdate, async (oldState, newState) => {

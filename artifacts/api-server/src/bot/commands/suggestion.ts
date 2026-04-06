@@ -92,7 +92,7 @@ export async function applySuggestionVerdict(
   );
 
   try {
-    const ch = interaction.guild.channels.cache.get(sugg.channelId);
+    const ch = await interaction.guild.channels.fetch(sugg.channelId).catch(() => null);
     if (ch?.isTextBased()) {
       const msg = await (ch as import("discord.js").TextChannel).messages.fetch(sugg.messageId).catch(() => null);
       await msg?.edit({ embeds: [embed], components: [disabledRow] }).catch(() => {});
