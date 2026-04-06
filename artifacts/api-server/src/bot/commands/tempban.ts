@@ -60,8 +60,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       reason: `[TEMP ${durationLabel}] ${reason} | By ${interaction.user.tag}`,
     });
 
-    await addTempBan(interaction.guild.id, target.id, target.tag, reason, unbanAt);
-    processTempBan(client, 0, interaction.guild.id, target.id, target.tag, unbanAt).catch(() => {});
+    const banId = await addTempBan(interaction.guild.id, target.id, target.tag, reason, unbanAt);
+    processTempBan(client, banId, interaction.guild.id, target.id, target.tag, unbanAt).catch(() => {});
 
     const embed = new EmbedBuilder()
       .setColor(THEME.ban)
