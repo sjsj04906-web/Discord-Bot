@@ -104,6 +104,9 @@ export const log = {
   command(name: string, user: string, guild: string): void {
     row("⌘ ", `/${name}`, c.dim, `${c.dim("by")} ${c.cyan(user)} ${c.dim("in")} ${c.dim(guild)}`);
   },
+  flag(user: string, guild: string, category: string): void {
+    row("🚩", "FLAG", c.yellow, `${c.cyan.bold(user)} ${c.dim("//")} ${c.dim(guild)} ${c.dim("→")} ${c.yellow(category)}`);
+  },
   error(msg: string): void {
     row("✖ ", "ERROR", c.red, c.red(msg));
   },

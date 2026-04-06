@@ -3,6 +3,7 @@ import { client, commands } from "./client.js";
 import { allCommands } from "./commands/index.js";
 import { handleAutoMod } from "./automod.js";
 import { handleMessageDelete, handleMessageUpdate } from "./events/messageLog.js";
+import { handleHarassmentDetection } from "./harassment.js";
 import { handleAntiRaid } from "./events/antiRaid.js";
 import { handleNewAccount } from "./events/memberJoin.js";
 import { printBanner, log } from "./display.js";
@@ -59,6 +60,7 @@ export function startBot(): void {
 
   client.on(Events.MessageCreate, async (message) => {
     await handleAutoMod(message);
+    await handleHarassmentDetection(message);
   });
 
   client.on(Events.MessageDelete, async (message) => {
