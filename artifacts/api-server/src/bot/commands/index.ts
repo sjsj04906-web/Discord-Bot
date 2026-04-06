@@ -37,6 +37,11 @@ import * as reactionrole from "./reactionrole.js";
 import * as exportwarns from "./exportwarns.js";
 import * as autorole from "./autorole.js";
 import * as modmailcmd from "./modmailcmd.js";
+import * as softban from "./softban.js";
+import * as snipe from "./snipe.js";
+import * as afk from "./afk.js";
+import * as verify from "./verify.js";
+import * as serverstats from "./serverstats.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -45,7 +50,7 @@ export interface SlashCommand {
 
 export const allCommands: SlashCommand[] = [
   ban, unban, kick, mute, unmute, tempmute,
-  warn, warningsCmd, removewarn, clear, bulkban,
+  warn, warningsCmd, removewarn, clear, bulkban, softban,
   slowmode, lock, unlock,
   userinfo, serverinfo,
   tempban, note, poll, role,
@@ -53,4 +58,5 @@ export const allCommands: SlashCommand[] = [
   history, report, stats, antiraid,
   caseCmd, welcome, ticket, temprole, reactionrole, exportwarns,
   autorole, modmailcmd,
+  snipe, afk, verify, serverstats,
 ];

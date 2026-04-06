@@ -6,6 +6,7 @@ import {
 } from "discord.js";
 import { getGuildConfig } from "../db.js";
 import { THEME } from "../theme.js";
+import { setSnipe } from "../utils/snipeStore.js";
 
 const LOG_CHANNEL_NAMES = ["message-log", "messagelog", "msg-log", "deleted-messages"];
 
@@ -19,6 +20,21 @@ async function getLogChannel(guild: NonNullable<Message["guild"]>): Promise<Text
 export async function handleMessageDelete(message: Message | PartialMessage): Promise<void> {
   if (!message.guild || message.author?.bot) return;
   if (!message.content && message.attachments.size === 0) return;
+
+  // Store for /snipe
+  if (message.author && message.content) {
+    const imageAttachment = message.attachments.find((a) =>
+      a.contentType?.startsWith("image/") ?? false
+    );
+    setSnipe(message.channelId, {
+      content:      message.content,
+      authorTag:    message.author.tag,
+      authorAvatar: message.author.displayAvatarURL(),
+      channelId:    message.channelId,
+      deletedAt:    new Date(),
+      imageUrl:     imageAttachment?.url,
+    });
+  }
 
   const config = await getGuildConfig(message.guild.id);
   if (!config.messageLogEnabled) return;

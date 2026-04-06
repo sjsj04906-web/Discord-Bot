@@ -257,6 +257,9 @@ export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
     autoRoleIds: "",
     warnExpiryDays: 0,
     modMailChannelId: "",
+    verifyRoleId: "",
+    memberCountChannelId: "",
+    humanCountChannelId: "",
   };
 
   await db.insert(guildConfigTable).values(defaults).onConflictDoNothing();

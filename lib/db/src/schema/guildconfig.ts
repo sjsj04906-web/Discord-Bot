@@ -22,6 +22,9 @@ export const guildConfigTable = pgTable("guild_config", {
   autoRoleIds:        text("auto_role_ids").default("").notNull(),
   warnExpiryDays:     integer("warn_expiry_days").default(0).notNull(),
   modMailChannelId:   text("mod_mail_channel_id").default("").notNull(),
+  verifyRoleId:          text("verify_role_id").default("").notNull(),
+  memberCountChannelId:  text("member_count_channel_id").default("").notNull(),
+  humanCountChannelId:   text("human_count_channel_id").default("").notNull(),
 });
 
 export const insertGuildConfigSchema = createInsertSchema(guildConfigTable);
