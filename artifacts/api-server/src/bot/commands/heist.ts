@@ -168,6 +168,10 @@ async function resolveHeist(interaction: ChatInputCommandInteraction, game: Heis
 
   if (success) {
     await Promise.all(players.map((uid) => addBalance(game.guildId, uid, payout)));
+    players.forEach((uid) => {
+      import("./quests.js").then((m) => m.incrementQuestProgress(game.guildId, uid, "heist")).catch(() => {});
+      import("./quests.js").then((m) => m.incrementQuestProgress(game.guildId, uid, "earn_coins", payout)).catch(() => {});
+    });
     const names = [...game.participants.values()].map((t) => `• ${t}`).join("\n");
     const embed = new EmbedBuilder()
       .setColor(THEME.success)

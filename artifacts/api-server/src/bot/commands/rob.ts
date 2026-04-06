@@ -103,6 +103,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const line   = SUCCESS_LINES[Math.floor(Math.random() * SUCCESS_LINES.length)]!;
     await incrementRobSuccesses(interaction.guild.id, interaction.user.id);
     checkAndAward(interaction.guild.id, interaction.user.id, interaction.channel as never, em).catch(() => {});
+    (await import("./quests.js")).incrementQuestProgress(interaction.guild.id, interaction.user.id, "rob_attempt").catch(() => {});
+    (await import("./quests.js")).incrementQuestProgress(interaction.guild.id, interaction.user.id, "earn_coins", stolen).catch(() => {});
+    // Bounty claim — if target had a bounty, pay it out to the robber
+    const bountyPayout = await (await import("./bounty.js")).claimBounties(interaction.guild.id, target.id, interaction.user.id).catch(() => 0);
 
     await interaction.reply({
       embeds: [
@@ -125,6 +129,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await addBalance(interaction.guild.id, target.id, fine);
     const newBal = robberEco.balance - fine;
     const line   = FAIL_LINES[Math.floor(Math.random() * FAIL_LINES.length)]!;
+    (await import("./quests.js")).incrementQuestProgress(interaction.guild.id, interaction.user.id, "rob_attempt").catch(() => {});
 
     await interaction.reply({
       embeds: [

@@ -91,6 +91,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   await incrementFishCount(interaction.guild.id, interaction.user.id);
   const newBal = await addBalance(interaction.guild.id, interaction.user.id, earned);
   checkAndAward(interaction.guild.id, interaction.user.id, interaction.channel as never, em).catch(() => {});
+  (await import("./quests.js")).incrementQuestProgress(interaction.guild.id, interaction.user.id, "fish").catch(() => {});
+  (await import("./quests.js")).incrementQuestProgress(interaction.guild.id, interaction.user.id, "earn_coins", earned).catch(() => {});
 
   const flavor = isLegend
     ? `\n> *${LEGENDARY_LINES[Math.floor(Math.random() * LEGENDARY_LINES.length)]}*`

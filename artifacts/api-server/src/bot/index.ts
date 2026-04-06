@@ -20,6 +20,7 @@ import { handleCounting } from "./events/counting.js";
 import { handleAntiNukeRoleDelete, handleAntiNukeChannelDelete, handleAntiNukeBanAdd } from "./events/antiNuke.js";
 import { handleWelcome } from "./events/welcome.js";
 import { handleBlackjackButton } from "./commands/gamble.js";
+import { checkLotteryDraws } from "./commands/lottery.js";
 import { handleHeistJoin } from "./commands/heist.js";
 import { handleDuelButton } from "./commands/duel.js";
 import { handleAutoResponder } from "./events/autoresponder.js";
@@ -77,6 +78,10 @@ export function startBot(): void {
     startReminderScheduler(readyClient);
     startInterestScheduler(readyClient);
     runRetroactiveCheck(readyClient).catch(() => {});
+
+    // Lottery draw checker — runs every 10 minutes
+    setInterval(() => checkLotteryDraws(readyClient).catch(() => {}), 10 * 60_000);
+    checkLotteryDraws(readyClient).catch(() => {});
     await initInviteTracker(readyClient);
   });
 

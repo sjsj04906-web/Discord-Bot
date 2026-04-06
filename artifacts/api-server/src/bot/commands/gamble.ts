@@ -297,6 +297,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       await deductBalance(interaction.guild.id, interaction.user.id, bet);
       newBal = eco.balance - bet;
     }
+    import("./quests.js").then((m) => {
+      m.incrementQuestProgress(interaction.guild!.id, interaction.user.id, "gamble_play").catch(() => {});
+      if (win) m.incrementQuestProgress(interaction.guild!.id, interaction.user.id, "gamble_win").catch(() => {});
+      if (win) m.incrementQuestProgress(interaction.guild!.id, interaction.user.id, "earn_coins", bet).catch(() => {});
+    }).catch(() => {});
     await interaction.reply({
       embeds: [
         new EmbedBuilder()

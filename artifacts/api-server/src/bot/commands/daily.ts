@@ -69,6 +69,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   await updateLastDaily(interaction.guild.id, interaction.user.id, streak);
   const newBal = await addBalance(interaction.guild.id, interaction.user.id, total);
   checkAndAward(interaction.guild.id, interaction.user.id, interaction.channel as never, em).catch(() => {});
+  (await import("./quests.js")).incrementQuestProgress(interaction.guild.id, interaction.user.id, "daily").catch(() => {});
+  (await import("./quests.js")).incrementQuestProgress(interaction.guild.id, interaction.user.id, "earn_coins", total).catch(() => {});
 
   const flavorLine  = streakLine(streak);
   const pInfo       = getPrestigeInfo(eco.prestige);

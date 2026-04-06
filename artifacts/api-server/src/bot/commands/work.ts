@@ -51,6 +51,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   await updateLastWork(interaction.guild.id, interaction.user.id);
   const newBal = await addBalance(interaction.guild.id, interaction.user.id, earned);
+  (await import("./quests.js")).incrementQuestProgress(interaction.guild.id, interaction.user.id, "work").catch(() => {});
+  (await import("./quests.js")).incrementQuestProgress(interaction.guild.id, interaction.user.id, "earn_coins", earned).catch(() => {});
   const pInfo  = getPrestigeInfo(eco.prestige);
 
   await interaction.reply({

@@ -183,6 +183,13 @@ export async function handleDuelButton(
 
   await addBalance(guildId, winnerId, prize);
 
+  import("./quests.js").then((m) => {
+    m.incrementQuestProgress(guildId, winnerId, "duel_win").catch(() => {});
+    m.incrementQuestProgress(guildId, winnerId, "duel_play").catch(() => {});
+    m.incrementQuestProgress(guildId, winnerId, "earn_coins", prize).catch(() => {});
+    m.incrementQuestProgress(guildId, loserId, "duel_play").catch(() => {});
+  }).catch(() => {});
+
   const winLine  = WIN_LINES[Math.floor(Math.random() * WIN_LINES.length)]!;
   const loseLine = LOSE_LINES[Math.floor(Math.random() * LOSE_LINES.length)]!;
 

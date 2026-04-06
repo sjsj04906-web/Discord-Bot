@@ -72,6 +72,10 @@ import * as achievements from "./achievements.js";
 import * as autoresponder from "./autoresponder.js";
 import * as duel from "./duel.js";
 import * as prestige from "./prestige.js";
+import * as market from "./market.js";
+import * as bounty from "./bounty.js";
+import * as lottery from "./lottery.js";
+import * as quests from "./quests.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -101,4 +105,5 @@ export const allCommands: SlashCommand[] = [
   rob, bank, fish, heist, duel,
   achievements, prestige,
   autoresponder,
+  market, bounty, lottery, quests,
 ];
