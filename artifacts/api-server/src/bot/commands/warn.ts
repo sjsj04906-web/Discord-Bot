@@ -80,6 +80,19 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   if (dmFailed)       notices.push(`> ⚠️ Could not DM this member — their messages are closed.`);
   if (nearThreshold)  notices.push(`> ⚡ **${target.username}** is one strike from the auto-mute threshold.`);
 
+  // ── Auto-mute at threshold ────────────────────────────────────────────────
+  if (total >= MUTE_THRESHOLD) {
+    try {
+      const member = interaction.guild.members.cache.get(target.id)
+        ?? await interaction.guild.members.fetch(target.id).catch(() => null);
+      if (member && !member.isCommunicationDisabled() && member.moderatable) {
+        const MUTE_MS = 3 * 60 * 60 * 1000; // 3-hour timeout
+        await member.timeout(MUTE_MS, `Auto-muted: reached ${MUTE_THRESHOLD} warnings`);
+        embed.addFields({ name: "🔇 Auto-Action", value: `**${target.username}** has been timed out for 3 hours (${MUTE_THRESHOLD}-strike threshold reached).`, inline: false });
+      }
+    } catch { /* bot may lack perms — log silently */ }
+  }
+
   await interaction.reply({ embeds: [embed], content: notices.length ? notices.join("\n") : undefined });
   log.warn(target.tag, interaction.guild.name, total, reason);
 

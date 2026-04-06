@@ -25,8 +25,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
+  // Ghost Cloak — filter out users actively cloaked from the leaderboard
+  const { hasActiveItem } = await import("./market.js");
+  const visibleRows = (await Promise.all(
+    rows.map(async (r) => ({ r, hidden: await hasActiveItem(interaction.guild.id, r.userId, "ghost_cloak").catch(() => false) }))
+  )).filter((x) => !x.hidden).map((x) => x.r);
+
+  if (visibleRows.length === 0) {
+    await interaction.reply({ content: "No economy data yet!", ephemeral: true });
+    return;
+  }
+
   const medals = ["🥇", "🥈", "🥉"];
-  const lines = rows.map((r, i) => {
+  const lines = visibleRows.map((r, i) => {
     const pos = page * limit + i + 1;
     const icon = i < 3 && page === 0 ? medals[i]! : `\`#${pos}\``;
     return `${icon} <@${r.userId}> — **${r.balance.toLocaleString()}** ${em}`;

@@ -186,7 +186,7 @@ export async function handleDuelButton(
   import("./quests.js").then((m) => {
     m.incrementQuestProgress(guildId, winnerId, "duel_win").catch(() => {});
     m.incrementQuestProgress(guildId, winnerId, "duel_play").catch(() => {});
-    m.incrementQuestProgress(guildId, winnerId, "earn_coins", prize).catch(() => {});
+    m.incrementQuestProgress(guildId, winnerId, "earn_coins", duel.amount).catch(() => {}); // net gain = stake, not full pot
     m.incrementQuestProgress(guildId, loserId, "duel_play").catch(() => {});
   }).catch(() => {});
 

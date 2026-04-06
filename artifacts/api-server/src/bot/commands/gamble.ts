@@ -233,6 +233,16 @@ async function resolveStand(interaction: ButtonInteraction, game: BJGame, isAuto
     // No deduction — bet was already taken at game start
   }
 
+  // Quest tracking for blackjack
+  import("./quests.js").then((m) => {
+    m.incrementQuestProgress(game.guildId, game.userId, "gamble_play").catch(() => {});
+    if (status === "win") {
+      m.incrementQuestProgress(game.guildId, game.userId, "gamble_win").catch(() => {});
+      const net = isNaturalBJ ? Math.floor(game.bet * 1.5) : game.bet;
+      m.incrementQuestProgress(game.guildId, game.userId, "earn_coins", net).catch(() => {});
+    }
+  }).catch(() => {});
+
   const fn = isAutoStand ? interaction.update : interaction.update;
   await fn.call(interaction, { embeds: [bjEmbed(game, status, game.currencyEmoji)], components: [] });
 }
@@ -337,6 +347,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       newBal  = eco.balance - bet;
       delta   = -bet;
     }
+    import("./quests.js").then((m) => {
+      m.incrementQuestProgress(interaction.guild!.id, interaction.user.id, "gamble_play").catch(() => {});
+      if (multiplier > 0) m.incrementQuestProgress(interaction.guild!.id, interaction.user.id, "gamble_win").catch(() => {});
+      if (multiplier > 0 && delta > 0) m.incrementQuestProgress(interaction.guild!.id, interaction.user.id, "earn_coins", delta).catch(() => {});
+    }).catch(() => {});
     await interaction.reply({
       embeds: [
         new EmbedBuilder()
@@ -372,6 +387,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       newBal = eco.balance - bet;
       delta  = -bet;
     }
+    import("./quests.js").then((m) => {
+      m.incrementQuestProgress(interaction.guild!.id, interaction.user.id, "gamble_play").catch(() => {});
+      if (win) m.incrementQuestProgress(interaction.guild!.id, interaction.user.id, "gamble_win").catch(() => {});
+      if (win && delta > 0) m.incrementQuestProgress(interaction.guild!.id, interaction.user.id, "earn_coins", delta).catch(() => {});
+    }).catch(() => {});
     await interaction.reply({
       embeds: [
         new EmbedBuilder()
@@ -419,6 +439,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       await addBalance(interaction.guild.id, interaction.user.id, bet + winAmount);
       await incrementBjWins(interaction.guild.id, interaction.user.id);
       checkAndAward(interaction.guild.id, interaction.user.id, interaction.channel as never, em).catch(() => {});
+      import("./quests.js").then((m) => {
+        m.incrementQuestProgress(interaction.guild!.id, interaction.user.id, "gamble_play").catch(() => {});
+        m.incrementQuestProgress(interaction.guild!.id, interaction.user.id, "gamble_win").catch(() => {});
+        m.incrementQuestProgress(interaction.guild!.id, interaction.user.id, "earn_coins", winAmount).catch(() => {});
+      }).catch(() => {});
       await interaction.reply({ embeds: [bjEmbed(game, "win", em)], components: [] });
       return;
     }

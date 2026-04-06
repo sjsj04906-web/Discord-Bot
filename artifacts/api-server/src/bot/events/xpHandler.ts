@@ -28,7 +28,15 @@ export async function handleXp(message: Message): Promise<void> {
 
   cooldowns.set(key, Date.now());
 
-  const earned = Math.floor(Math.random() * (XP_MAX - XP_MIN + 1)) + XP_MIN;
+  let earned = Math.floor(Math.random() * (XP_MAX - XP_MIN + 1)) + XP_MIN;
+  // XP Surge market item — doubles per-message XP for 1 hour
+  try {
+    const { hasActiveItem } = await import("../commands/market.js");
+    if (await hasActiveItem(message.guild.id, message.author.id, "xp_surge")) {
+      earned *= 2;
+    }
+  } catch { /* market module unavailable — skip buff */ }
+
   const { oldLevel, newLevel, newXp } = await addXp(message.guild.id, message.author.id, earned);
 
   logger.info({ userId: message.author.id, earned, oldLevel, newLevel, newXp }, "XP awarded");
