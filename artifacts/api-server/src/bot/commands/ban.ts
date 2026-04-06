@@ -6,7 +6,7 @@ import {
 } from "discord.js";
 import { log } from "../display.js";
 import { sendModLog } from "../modlog.js";
-import { THEME } from "../theme.js";
+import { THEME, BOT_NAME } from "../theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("ban")
@@ -36,40 +36,46 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const member = interaction.guild.members.cache.get(target.id);
   if (member && !member.bannable) {
-    await interaction.reply({ content: "Cannot ban this entity — insufficient clearance.", ephemeral: true });
+    await interaction.reply({ content: "I don't have permission to ban this member.", ephemeral: true });
     return;
   }
 
   try {
     await interaction.guild.members.ban(target, {
-      reason: `${reason} | Banned by ${interaction.user.tag}`,
+      reason: `${reason} — banned by ${interaction.user.tag}`,
       deleteMessageSeconds: deleteDays * 86400,
     });
 
     const embed = new EmbedBuilder()
       .setColor(THEME.ban)
-      .setTitle("💀 // ENTITY BANNED")
+      .setAuthor({ name: `⛔  Member Banned  ·  ${BOT_NAME}` })
+      .setTitle(target.tag)
+      .setURL(`https://discord.com/users/${target.id}`)
       .setThumbnail(target.displayAvatarURL())
       .addFields(
-        { name: "TARGET", value: `${target} \`${target.tag}\``, inline: true },
-        { name: "OPERATOR", value: `${interaction.user}`, inline: true },
-        { name: "REASON", value: reason },
+        { name: "Member",    value: `${target}`, inline: true },
+        { name: "Moderator", value: `${interaction.user}`, inline: true },
       )
+      .addFields({ name: "Reason", value: reason })
       .setFooter({ text: `ID: ${target.id}` })
       .setTimestamp();
+
+    if (deleteDays > 0) {
+      embed.addFields({ name: "Message History", value: `${deleteDays} day(s) deleted`, inline: true });
+    }
 
     await interaction.reply({ embeds: [embed] });
     log.ban(target.tag, interaction.guild.name, reason);
 
     await sendModLog(interaction.guild, {
-      action: "💀 BAN // ENTITY REMOVED",
+      action: "⛔  Member Banned",
       color: THEME.ban,
       target,
       moderator: interaction.user,
       reason,
-      extra: deleteDays > 0 ? { "MESSAGES PURGED": `${deleteDays} day(s)` } : undefined,
+      extra: deleteDays > 0 ? { "Message History Deleted": `${deleteDays} day(s)` } : undefined,
     });
   } catch (err) {
-    await interaction.reply({ content: `Execution failed: ${String(err)}`, ephemeral: true });
+    await interaction.reply({ content: `Failed to ban member: ${String(err)}`, ephemeral: true });
   }
 }

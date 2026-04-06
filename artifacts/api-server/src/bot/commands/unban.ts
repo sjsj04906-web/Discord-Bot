@@ -6,7 +6,7 @@ import {
 } from "discord.js";
 import { log } from "../display.js";
 import { sendModLog } from "../modlog.js";
-import { THEME } from "../theme.js";
+import { THEME, BOT_NAME } from "../theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("unban")
@@ -30,17 +30,19 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   try {
     const ban = await interaction.guild.bans.fetch(userId);
-    await interaction.guild.members.unban(userId, `${reason} | Unbanned by ${interaction.user.tag}`);
+    await interaction.guild.members.unban(userId, `${reason} — unbanned by ${interaction.user.tag}`);
 
     const embed = new EmbedBuilder()
       .setColor(THEME.unban)
-      .setTitle("🔓 // ACCESS RESTORED")
+      .setAuthor({ name: `✅  Member Unbanned  ·  ${BOT_NAME}` })
+      .setTitle(ban.user.tag)
+      .setURL(`https://discord.com/users/${ban.user.id}`)
       .setThumbnail(ban.user.displayAvatarURL())
       .addFields(
-        { name: "TARGET", value: `\`${ban.user.tag}\``, inline: true },
-        { name: "OPERATOR", value: `${interaction.user}`, inline: true },
-        { name: "REASON", value: reason },
+        { name: "Member",    value: `\`${ban.user.tag}\``, inline: true },
+        { name: "Moderator", value: `${interaction.user}`, inline: true },
       )
+      .addFields({ name: "Reason", value: reason })
       .setFooter({ text: `ID: ${userId}` })
       .setTimestamp();
 
@@ -48,7 +50,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     log.unban(ban.user.tag, interaction.guild.name);
 
     await sendModLog(interaction.guild, {
-      action: "🔓 UNBAN // ACCESS RESTORED",
+      action: "✅  Member Unbanned",
       color: THEME.unban,
       target: ban.user,
       moderator: interaction.user,

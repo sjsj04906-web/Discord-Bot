@@ -8,7 +8,7 @@ import { log } from "../display.js";
 import { sendModLog } from "../modlog.js";
 import { addTempBan } from "../db.js";
 import { processTempBan } from "../tempbanScheduler.js";
-import { THEME } from "../theme.js";
+import { THEME, BOT_NAME } from "../theme.js";
 import { client } from "../client.js";
 
 const DURATIONS = [
@@ -49,7 +49,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const member = interaction.guild.members.cache.get(target.id);
   if (member && !member.bannable) {
-    await interaction.reply({ content: "Cannot ban this entity — insufficient clearance.", ephemeral: true });
+    await interaction.reply({ content: "I don't have permission to ban this member.", ephemeral: true });
     return;
   }
 
@@ -57,7 +57,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   try {
     await interaction.guild.members.ban(target, {
-      reason: `[TEMP ${durationLabel}] ${reason} | By ${interaction.user.tag}`,
+      reason: `[Temp ${durationLabel}] ${reason} — by ${interaction.user.tag}`,
     });
 
     const banId = await addTempBan(interaction.guild.id, target.id, target.tag, reason, unbanAt);
@@ -65,31 +65,33 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     const embed = new EmbedBuilder()
       .setColor(THEME.ban)
-      .setTitle("⏳ // TEMP BAN ISSUED")
+      .setAuthor({ name: `⏳  Temporary Ban  ·  ${BOT_NAME}` })
+      .setTitle(target.tag)
+      .setURL(`https://discord.com/users/${target.id}`)
       .setThumbnail(target.displayAvatarURL())
       .addFields(
-        { name: "TARGET",    value: `${target} \`${target.tag}\``, inline: true },
-        { name: "OPERATOR",  value: `${interaction.user}`, inline: true },
-        { name: "DURATION",  value: durationLabel, inline: true },
-        { name: "EXPIRES",   value: `<t:${Math.floor(unbanAt.getTime() / 1000)}:R>`, inline: true },
-        { name: "REASON",    value: reason },
+        { name: "Member",    value: `${target}`, inline: true },
+        { name: "Moderator", value: `${interaction.user}`, inline: true },
+        { name: "Duration",  value: durationLabel, inline: true },
+        { name: "Expires",   value: `<t:${Math.floor(unbanAt.getTime() / 1000)}:R>`, inline: true },
+        { name: "Reason",    value: reason },
       )
       .setFooter({ text: `ID: ${target.id}` })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
-    log.ban(target.tag, interaction.guild.name, `TEMP ${durationLabel} — ${reason}`);
+    log.ban(target.tag, interaction.guild.name, `Temp ${durationLabel} — ${reason}`);
 
     await sendModLog(interaction.guild, {
-      action: "⏳ TEMP BAN",
+      action: "⏳  Temporary Ban",
       color: THEME.ban,
       target,
       moderator: interaction.user,
       reason,
       duration: durationLabel,
-      extra: { EXPIRES: `<t:${Math.floor(unbanAt.getTime() / 1000)}:R>` },
+      extra: { "Expires": `<t:${Math.floor(unbanAt.getTime() / 1000)}:R>` },
     });
   } catch (err) {
-    await interaction.reply({ content: `Execution failed: ${String(err)}`, ephemeral: true });
+    await interaction.reply({ content: `Failed to ban member: ${String(err)}`, ephemeral: true });
   }
 }

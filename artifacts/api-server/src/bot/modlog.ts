@@ -28,7 +28,6 @@ export interface ModLogEntry {
 }
 
 export async function sendModLog(guild: Guild, entry: ModLogEntry): Promise<number | null> {
-  // Log case to DB (unless explicitly skipped, e.g. automod)
   let caseId: number | null = null;
   if (!entry.skipCase) {
     const actionType = entry.action.replace(/[^a-zA-Z\s]/g, "").trim().split(" ").slice(-1)[0] ?? entry.action;
@@ -48,18 +47,20 @@ export async function sendModLog(guild: Guild, entry: ModLogEntry): Promise<numb
   if (!channel) return caseId;
 
   const embed = new EmbedBuilder()
-    .setTitle(entry.action)
     .setColor(entry.color)
+    .setAuthor({ name: entry.action })
+    .setTitle(entry.target.tag)
+    .setURL(`https://discord.com/users/${entry.target.id}`)
     .setThumbnail(entry.target.displayAvatarURL())
     .addFields(
-      { name: "USER",     value: `${entry.target} \`${entry.target.tag}\``, inline: true },
-      { name: "OPERATOR", value: `${entry.moderator} \`${entry.moderator.tag}\``, inline: true },
+      { name: "Member",    value: `${entry.target} \`${entry.target.id}\``, inline: true },
+      { name: "Moderator", value: `${entry.moderator}`, inline: true },
     )
-    .setFooter({ text: `${BOT_NAME}${caseId ? ` • Case #${caseId}` : ""} • ID: ${entry.target.id}` })
+    .setFooter({ text: `${caseId ? `Case #${caseId}  ·  ` : ""}${BOT_NAME}` })
     .setTimestamp();
 
-  if (entry.duration) embed.addFields({ name: "DURATION", value: entry.duration, inline: true });
-  if (entry.reason)   embed.addFields({ name: "REASON",   value: entry.reason });
+  if (entry.duration) embed.addFields({ name: "Duration", value: entry.duration, inline: true });
+  if (entry.reason)   embed.addFields({ name: "Reason",   value: entry.reason });
 
   if (entry.extra) {
     for (const [name, value] of Object.entries(entry.extra)) {

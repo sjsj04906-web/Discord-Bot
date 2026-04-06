@@ -45,11 +45,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const member = interaction.guild.members.cache.get(target.id);
   if (!member) {
-    await interaction.reply({ content: "Member not found in this server.", ephemeral: true });
+    await interaction.reply({ content: "That member isn't in this server.", ephemeral: true });
     return;
   }
   if (!member.moderatable) {
-    await interaction.reply({ content: "I cannot mute this member — they may have a higher role.", ephemeral: true });
+    await interaction.reply({ content: "I don't have permission to mute this member.", ephemeral: true });
     return;
   }
 
@@ -57,46 +57,53 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const label = formatDuration(ms);
   const expiresAt = new Date(Date.now() + ms);
+  const expiresTs = Math.floor(expiresAt.getTime() / 1000);
 
-  let dmStatus = "";
+  let dmNote = "";
   try {
-    const dmEmbed = new EmbedBuilder()
-      .setColor(THEME.mute)
-      .setTitle(`🔇 ${BOT_NAME} // TEMPORARY MUTE`)
-      .setDescription(`You have been muted in **${interaction.guild.name}** for **${label}**.`)
-      .addFields(
-        { name: "REASON",   value: reason },
-        { name: "EXPIRES",  value: `<t:${Math.floor(expiresAt.getTime() / 1000)}:F>` },
-      )
-      .setTimestamp();
-    await target.send({ embeds: [dmEmbed] });
+    await target.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(THEME.mute)
+          .setAuthor({ name: `🔇  You've been muted  ·  ${BOT_NAME}` })
+          .setTitle(interaction.guild.name)
+          .setDescription(`You have been temporarily muted for **${label}**.`)
+          .addFields(
+            { name: "Reason",  value: reason },
+            { name: "Expires", value: `<t:${expiresTs}:F>` },
+          )
+          .setTimestamp(),
+      ],
+    });
   } catch {
-    dmStatus = "\n> ⚠️ Could not DM this user.";
+    dmNote = "Could not DM this member.";
   }
 
   const embed = new EmbedBuilder()
     .setColor(THEME.mute)
-    .setTitle("🔇 // TEMP MUTE APPLIED")
+    .setAuthor({ name: `🔇  Temporary Mute  ·  ${BOT_NAME}` })
+    .setTitle(target.tag)
+    .setURL(`https://discord.com/users/${target.id}`)
     .setThumbnail(target.displayAvatarURL())
     .addFields(
-      { name: "TARGET",   value: `${target} \`${target.tag}\``, inline: true },
-      { name: "OPERATOR", value: `${interaction.user}`, inline: true },
-      { name: "DURATION", value: label, inline: true },
-      { name: "EXPIRES",  value: `<t:${Math.floor(expiresAt.getTime() / 1000)}:R>`, inline: true },
-      { name: "REASON",   value: reason },
+      { name: "Member",    value: `${target}`, inline: true },
+      { name: "Moderator", value: `${interaction.user}`, inline: true },
+      { name: "Duration",  value: label, inline: true },
+      { name: "Expires",   value: `<t:${expiresTs}:R>`, inline: true },
+      { name: "Reason",    value: reason },
     )
-    .setFooter({ text: `ID: ${target.id}` })
+    .setFooter({ text: `ID: ${target.id}${dmNote ? "  ·  DM failed" : "  ·  Member notified"}` })
     .setTimestamp();
 
-  await interaction.reply({ embeds: [embed], content: dmStatus || undefined });
+  await interaction.reply({ embeds: [embed], content: dmNote ? `> ⚠️ ${dmNote}` : undefined });
 
   await sendModLog(interaction.guild, {
-    action: "🔇 TEMP MUTE // COMMS RESTRICTED",
+    action: "🔇  Temporary Mute",
     color: THEME.mute,
     target,
     moderator: interaction.user,
     reason,
     duration: label,
-    extra: { EXPIRES: `<t:${Math.floor(expiresAt.getTime() / 1000)}:F>` },
+    extra: { "Expires": `<t:${expiresTs}:R>` },
   });
 }
