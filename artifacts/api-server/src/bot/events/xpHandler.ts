@@ -1,5 +1,5 @@
 import { type Message, EmbedBuilder, type TextChannel } from "discord.js";
-import { getGuildConfig, getOrCreateXp, addXp, getLevelRoles } from "../db.js";
+import { getGuildConfig, addXp, getLevelRoles } from "../db.js";
 import { THEME, BOT_NAME } from "../theme.js";
 import { levelFromXp, xpProgressInLevel, progressBar } from "../utils/xpMath.js";
 
@@ -10,6 +10,15 @@ const cooldowns = new Map<string, number>();
 const COOLDOWN_MS = 60_000;
 const XP_MIN = 15;
 const XP_MAX = 25;
+
+// Find the highest role the member qualifies for at a given level
+function qualifyingRole(
+  levelRoles: Awaited<ReturnType<typeof getLevelRoles>>,
+  atLevel: number
+) {
+  // getLevelRoles returns sorted ascending — last qualifying entry wins
+  return [...levelRoles].filter((lr) => lr.level <= atLevel).at(-1) ?? null;
+}
 
 export async function handleXp(message: Message): Promise<void> {
   if (!message.guild || message.author.bot) return;
@@ -29,35 +38,36 @@ export async function handleXp(message: Message): Promise<void> {
 
   if (newLevel <= oldLevel) return;
 
-  // Assign / swap level roles
+  // ── Role swap ──────────────────────────────────────────────────────────────
   const levelRoles = await getLevelRoles(message.guild.id);
-  const member = message.guild.members.cache.get(message.author.id)
-    ?? await message.guild.members.fetch(message.author.id).catch(() => null);
+  const oldRole    = qualifyingRole(levelRoles, oldLevel);
+  const newRole    = qualifyingRole(levelRoles, newLevel);
 
-  if (member) {
-    const rolesToRemove = levelRoles
-      .filter((lr) => lr.level !== newLevel)
-      .map((lr) => lr.roleId);
+  // Only touch roles if the qualifying role actually changed
+  if (newRole && newRole.roleId !== oldRole?.roleId) {
+    const member = message.guild.members.cache.get(message.author.id)
+      ?? await message.guild.members.fetch(message.author.id).catch(() => null);
 
-    const newRoleEntry = levelRoles.find((lr) => lr.level === newLevel);
+    if (member) {
+      try {
+        // Remove the old qualifying role (and any stale level roles just in case)
+        const staleIds = levelRoles
+          .filter((lr) => lr.roleId !== newRole.roleId)
+          .map((lr) => lr.roleId);
+        if (staleIds.length > 0) await member.roles.remove(staleIds).catch(() => {});
 
-    try {
-      if (rolesToRemove.length > 0) {
-        await member.roles.remove(rolesToRemove as string[]).catch(() => {});
-      }
-      if (newRoleEntry) {
-        const role = message.guild.roles.cache.get(newRoleEntry.roleId);
-        if (role) await member.roles.add(role).catch(() => {});
-      }
-    } catch { /* missing perms */ }
+        // Grant the new role
+        const discordRole = message.guild.roles.cache.get(newRole.roleId);
+        if (discordRole) await member.roles.add(discordRole).catch(() => {});
+      } catch { /* missing perms */ }
+    }
   }
 
-  // Determine which channel to post in
+  // ── Level-up announcement ──────────────────────────────────────────────────
   const announceCh = (config.levelUpChannelId
     ? (message.guild.channels.cache.get(config.levelUpChannelId) as TextChannel | undefined)
     : null) ?? (message.channel as TextChannel);
 
-  const newRoleEntry = levelRoles.find((lr) => lr.level === newLevel);
   const { current, needed } = xpProgressInLevel(newXp);
 
   const embed = new EmbedBuilder()
@@ -71,8 +81,8 @@ export async function handleXp(message: Message): Promise<void> {
       { name: "Progress", value: `${progressBar(current, needed)} ${current}/${needed} XP to next`, inline: false },
     )
     .setFooter({
-      text: newRoleEntry
-        ? `New role unlocked: ${newRoleEntry.roleName}`
+      text: newRole && newRole.roleId !== oldRole?.roleId
+        ? `🎖️ New role unlocked: ${newRole.roleName}`
         : `${BOT_NAME}  ·  Keep chatting to level up`,
     })
     .setTimestamp();
