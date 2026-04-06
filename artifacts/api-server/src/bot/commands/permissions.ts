@@ -8,9 +8,9 @@ import { getCommandRoles, addCommandRole, removeCommandRole, clearCommandRoles }
 import { THEME } from "../theme.js";
 
 const COMMAND_NAMES = [
-  "automod", "ban", "clear", "kick", "lock", "mute", "note",
-  "permissions", "poll", "removewarn", "role", "serverinfo",
-  "slowmode", "tempban", "unban", "unlock", "unmute",
+  "antiraid", "automod", "ban", "clear", "history", "kick", "lock", "mute", "note",
+  "permissions", "poll", "removewarn", "report", "role", "serverinfo",
+  "slowmode", "stats", "tempban", "unban", "unlock", "unmute",
   "userinfo", "warn", "warnings",
 ].sort();
 

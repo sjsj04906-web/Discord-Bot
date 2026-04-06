@@ -32,6 +32,15 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   await addWarning(interaction.guild.id, target.id, reason, interaction.user.tag);
   const total = await countWarnings(interaction.guild.id, target.id);
 
+  let dmStatus = "";
+  try {
+    await target.send(
+      `⚠️ **${BOT_NAME} // VIOLATION NOTICE**\n\nYou have been warned in **${interaction.guild.name}**.\n**Reason:** ${reason}\n**Warning #:** ${total}`
+    );
+  } catch {
+    dmStatus = "\n> ⚠️ Could not DM this user — their direct messages are closed.";
+  }
+
   const embed = new EmbedBuilder()
     .setColor(THEME.warn)
     .setTitle("⚠️ // VIOLATION LOGGED")
@@ -42,10 +51,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       { name: "WARNING #", value: String(total), inline: true },
       { name: "REASON",    value: reason },
     )
-    .setFooter({ text: `ID: ${target.id}` })
+    .setFooter({ text: `ID: ${target.id}${dmStatus ? " • DM failed" : " • User notified via DM"}` })
     .setTimestamp();
 
-  await interaction.reply({ embeds: [embed] });
+  await interaction.reply({ embeds: [embed], content: dmStatus || undefined });
   log.warn(target.tag, interaction.guild.name, total, reason);
 
   await sendModLog(interaction.guild, {
@@ -56,12 +65,4 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     reason,
     extra: { "TOTAL WARNINGS": String(total) },
   });
-
-  try {
-    await target.send(
-      `⚠️ **${BOT_NAME} // VIOLATION NOTICE**\n\nYou have been warned in **${interaction.guild.name}**.\n**Reason:** ${reason}\n**Warning #:** ${total}`
-    );
-  } catch {
-    // DMs closed
-  }
 }

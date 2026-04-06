@@ -4,6 +4,9 @@ import { THEME } from "../theme.js";
 
 const MOD_CHANNEL_NAMES = ["mod-log", "modlog", "mod-logs", "modlogs"];
 
+const DEHOIST_PATTERN = /^[^a-zA-Z0-9]/;
+const DEHOIST_PREFIX = "zzz";
+
 export async function handleNewAccount(member: GuildMember): Promise<void> {
   const config = await getGuildConfig(member.guild.id);
   if (config.newAccountDays === 0) return;
@@ -23,12 +26,22 @@ export async function handleNewAccount(member: GuildMember): Promise<void> {
     .setThumbnail(member.user.displayAvatarURL())
     .setDescription(`${member} joined with a **${Math.floor(accountAgeDays * 24)} hour old** account.`)
     .addFields(
-      { name: "USER", value: `${member.user} \`${member.user.tag}\``, inline: true },
-      { name: "ACCOUNT AGE", value: `${Math.floor(accountAgeDays * 24)}h`, inline: true },
-      { name: "THRESHOLD", value: `${config.newAccountDays} days`, inline: true },
+      { name: "USER",         value: `${member.user} \`${member.user.tag}\``, inline: true },
+      { name: "ACCOUNT AGE",  value: `${Math.floor(accountAgeDays * 24)}h`, inline: true },
+      { name: "THRESHOLD",    value: `${config.newAccountDays} days`, inline: true },
     )
     .setFooter({ text: `User ID: ${member.user.id}` })
     .setTimestamp();
 
   await channel.send({ embeds: [embed] }).catch(() => {});
+}
+
+export async function handleDehoist(member: GuildMember): Promise<void> {
+  const displayName = member.nickname ?? member.user.username;
+  if (!DEHOIST_PATTERN.test(displayName)) return;
+
+  const newNick = `${DEHOIST_PREFIX} ${member.user.username}`.slice(0, 32);
+  try {
+    await member.setNickname(newNick, "Auto-dehoist: username started with a special character");
+  } catch { /* no perms */ }
 }

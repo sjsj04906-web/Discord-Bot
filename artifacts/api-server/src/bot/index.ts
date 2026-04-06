@@ -5,7 +5,7 @@ import { handleAutoMod } from "./automod.js";
 import { handleMessageDelete, handleMessageUpdate } from "./events/messageLog.js";
 import { handleHarassmentDetection } from "./harassment.js";
 import { handleAntiRaid } from "./events/antiRaid.js";
-import { handleNewAccount } from "./events/memberJoin.js";
+import { handleNewAccount, handleDehoist } from "./events/memberJoin.js";
 import { printBanner, log } from "./display.js";
 import { startStatusRotation } from "./statusRotation.js";
 import { restorePendingTempBans } from "./tempbanScheduler.js";
@@ -97,6 +97,11 @@ export function startBot(): void {
     log.join(member.user.tag, member.guild.name);
     await handleAntiRaid(member);
     await handleNewAccount(member);
+    await handleDehoist(member);
+  });
+
+  client.on(Events.GuildMemberUpdate, async (_old, newMember) => {
+    await handleDehoist(newMember);
   });
 
   client.on(Events.Error, (err) => {

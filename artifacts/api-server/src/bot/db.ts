@@ -1,5 +1,5 @@
-import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable } from "@workspace/db";
+import { eq, and, desc, count, sql } from "drizzle-orm";
 import type { GuildConfig } from "@workspace/db";
 
 // ─── Warnings ─────────────────────────────────────────────────────────────────
@@ -106,6 +106,44 @@ export async function getWordFilter(guildId: string): Promise<string[]> {
 export async function clearWordFilter(guildId: string): Promise<void> {
   await db.delete(wordFilterTable).where(eq(wordFilterTable.guildId, guildId));
   wordFilterCache.delete(guildId);
+}
+
+// ─── Cases ────────────────────────────────────────────────────────────────────
+export async function logCase(
+  guildId: string,
+  actionType: string,
+  targetId: string,
+  targetTag: string,
+  moderatorId: string,
+  moderatorTag: string,
+  reason: string,
+  extra = ""
+): Promise<number> {
+  const rows = await db
+    .insert(casesTable)
+    .values({ guildId, actionType, targetId, targetTag, moderatorId, moderatorTag, reason, extra })
+    .returning({ id: casesTable.id });
+  return rows[0]!.id;
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+export async function getServerStats(guildId: string) {
+  const [warnings, automod, cases, tempbans, notes, words] = await Promise.all([
+    db.select({ c: count() }).from(warningsTable).where(eq(warningsTable.guildId, guildId)),
+    db.select({ c: count() }).from(warningsTable).where(and(eq(warningsTable.guildId, guildId), eq(warningsTable.moderatorTag, "GL1TCH"))),
+    db.select({ c: count() }).from(casesTable).where(eq(casesTable.guildId, guildId)),
+    db.select({ c: count() }).from(tempBansTable).where(and(eq(tempBansTable.guildId, guildId), eq(tempBansTable.unbanned, false))),
+    db.select({ c: count() }).from(notesTable).where(eq(notesTable.guildId, guildId)),
+    db.select({ c: count() }).from(wordFilterTable).where(eq(wordFilterTable.guildId, guildId)),
+  ]);
+  return {
+    totalWarnings:     Number(warnings[0]?.c ?? 0),
+    automodIntercepts: Number(automod[0]?.c ?? 0),
+    totalCases:        Number(cases[0]?.c ?? 0),
+    activeTempBans:    Number(tempbans[0]?.c ?? 0),
+    totalNotes:        Number(notes[0]?.c ?? 0),
+    bannedWords:       Number(words[0]?.c ?? 0),
+  };
 }
 
 // ─── Command permissions ──────────────────────────────────────────────────────

@@ -212,6 +212,7 @@ export async function handleAutoMod(message: Message): Promise<void> {
     moderator: message.client.user!,
     reason: violations.join(", "),
     extra: { "WARNING #": String(total) },
+    skipCase: true,
   });
 
   if (config.autoEscalation) {

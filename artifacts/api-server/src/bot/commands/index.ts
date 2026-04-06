@@ -23,6 +23,10 @@ import * as role from "./role.js";
 import * as automodconfig from "./automodconfig.js";
 import * as removewarn from "./removewarn.js";
 import * as permissions from "./permissions.js";
+import * as history from "./history.js";
+import * as report from "./report.js";
+import * as stats from "./stats.js";
+import * as antiraid from "./antiraid.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -36,4 +40,5 @@ export const allCommands: SlashCommand[] = [
   userinfo, serverinfo,
   tempban, note, poll, role,
   automodconfig, permissions,
+  history, report, stats, antiraid,
 ];
