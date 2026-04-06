@@ -9,7 +9,7 @@ import { handleNewAccount, handleDehoist, handleAutoRole, handleRoleRestore } fr
 import { handleMemberLeave } from "./events/memberLeave.js";
 import { handleMemberUpdate } from "./events/memberUpdate.js";
 import { handleAntiGhostping } from "./events/antiGhostping.js";
-import { handleDirectMessage, handleModMailReply } from "./events/modmail.js";
+import { handleDirectMessage, handleModMailReply, handleModMailButtonInteraction } from "./events/modmail.js";
 import { handleVoiceStateUpdate } from "./events/voiceLog.js";
 import { handleWelcome } from "./events/welcome.js";
 import { handleReactionAdd, handleReactionRemove } from "./events/reactionRoles.js";
@@ -50,6 +50,12 @@ export function startBot(): void {
   });
 
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
+    // ── Mod mail choice buttons ──────────────────────────────────────────────
+    if (interaction.isButton() && (interaction.customId === "modmail_anon" || interaction.customId === "modmail_open")) {
+      await handleModMailButtonInteraction(interaction);
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const command = commands.get(interaction.commandName);
