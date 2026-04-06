@@ -12,17 +12,17 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((s) =>
     s.setName("coinflip")
       .setDescription("Flip a coin — double or nothing")
-      .addIntegerOption((o) => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1))
+      .addStringOption((o) => o.setName("bet").setDescription('Amount to bet (or "all" / "max")').setRequired(true))
   )
   .addSubcommand((s) =>
     s.setName("slots")
       .setDescription("Spin the slot machine")
-      .addIntegerOption((o) => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1))
+      .addStringOption((o) => o.setName("bet").setDescription('Amount to bet (or "all" / "max")').setRequired(true))
   )
   .addSubcommand((s) =>
     s.setName("roulette")
       .setDescription("Bet on roulette")
-      .addIntegerOption((o) => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1))
+      .addStringOption((o) => o.setName("bet").setDescription('Amount to bet (or "all" / "max")').setRequired(true))
       .addStringOption((o) =>
         o.setName("color").setDescription("Choose red, black, or green").setRequired(true)
           .addChoices(
@@ -35,7 +35,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((s) =>
     s.setName("blackjack")
       .setDescription("Play blackjack against the dealer")
-      .addIntegerOption((o) => o.setName("bet").setDescription("Amount to bet").setRequired(true).setMinValue(1))
+      .addStringOption((o) => o.setName("bet").setDescription('Amount to bet (or "all" / "max")').setRequired(true))
   );
 
 // ─── Slot machine ─────────────────────────────────────────────────────────────
@@ -232,11 +232,41 @@ async function resolveStand(interaction: ButtonInteraction, game: BJGame, isAuto
 // ─── Main execute ─────────────────────────────────────────────────────────────
 export async function execute(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) return;
-  const sub  = interaction.options.getSubcommand();
-  const bet  = interaction.options.getInteger("bet", true);
+  const sub    = interaction.options.getSubcommand();
+  const betRaw = interaction.options.getString("bet", true).toLowerCase().trim();
   const config = await getGuildConfig(interaction.guild.id);
-  const eco  = await getBalance(interaction.guild.id, interaction.user.id);
-  const em   = config.currencyEmoji;
+  const eco    = await getBalance(interaction.guild.id, interaction.user.id);
+  const em     = config.currencyEmoji;
+
+  // Resolve "all" / "max" to the user's current balance
+  let bet: number;
+  if (betRaw === "all" || betRaw === "max") {
+    bet = eco.balance;
+  } else {
+    bet = Math.floor(Number(betRaw));
+  }
+
+  if (!Number.isFinite(bet) || bet < 1) {
+    await interaction.reply({
+      embeds: [
+        new EmbedBuilder().setColor(THEME.danger)
+          .setDescription(`❌ Invalid bet amount. Enter a number, \`all\`, or \`max\`.`),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  if (eco.balance < 1) {
+    await interaction.reply({
+      embeds: [
+        new EmbedBuilder().setColor(THEME.danger)
+          .setDescription(`❌ You're broke! Earn some ${em} with \`/daily\` or \`/work\`.`),
+      ],
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
   if (eco.balance < bet) {
     await interaction.reply({
