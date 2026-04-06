@@ -1,4 +1,4 @@
-import { db, warningsTable, notesTable, tempBansTable, guildConfigTable } from "@workspace/db";
+import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import type { GuildConfig } from "@workspace/db";
 
@@ -62,6 +62,43 @@ export async function markTempBanUnbanned(id: number) {
   await db.update(tempBansTable).set({ unbanned: true }).where(eq(tempBansTable.id, id));
 }
 
+// ─── Word filter ──────────────────────────────────────────────────────────────
+const wordFilterCache = new Map<string, string[]>();
+
+export async function addBannedWord(guildId: string, word: string, addedBy: string): Promise<boolean> {
+  const existing = await getWordFilter(guildId);
+  if (existing.includes(word.toLowerCase())) return false;
+  await db.insert(wordFilterTable).values({ guildId, word: word.toLowerCase(), addedBy });
+  wordFilterCache.delete(guildId);
+  return true;
+}
+
+export async function removeBannedWord(guildId: string, word: string): Promise<boolean> {
+  const rows = await db
+    .select()
+    .from(wordFilterTable)
+    .where(and(eq(wordFilterTable.guildId, guildId), eq(wordFilterTable.word, word.toLowerCase())));
+  if (rows.length === 0) return false;
+  await db
+    .delete(wordFilterTable)
+    .where(and(eq(wordFilterTable.guildId, guildId), eq(wordFilterTable.word, word.toLowerCase())));
+  wordFilterCache.delete(guildId);
+  return true;
+}
+
+export async function getWordFilter(guildId: string): Promise<string[]> {
+  if (wordFilterCache.has(guildId)) return wordFilterCache.get(guildId)!;
+  const rows = await db.select().from(wordFilterTable).where(eq(wordFilterTable.guildId, guildId));
+  const words = rows.map((r) => r.word);
+  wordFilterCache.set(guildId, words);
+  return words;
+}
+
+export async function clearWordFilter(guildId: string): Promise<void> {
+  await db.delete(wordFilterTable).where(eq(wordFilterTable.guildId, guildId));
+  wordFilterCache.delete(guildId);
+}
+
 // ─── Guild config ─────────────────────────────────────────────────────────────
 const configCache = new Map<string, GuildConfig>();
 
@@ -87,6 +124,9 @@ export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
     antiRaidEnabled: true,
     antiRaidThreshold: 10,
     antiRaidWindowSecs: 30,
+    maxEmojis: 15,
+    linkFilterEnabled: false,
+    maxNewlines: 8,
   };
 
   await db.insert(guildConfigTable).values(defaults).onConflictDoNothing();

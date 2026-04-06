@@ -14,6 +14,9 @@ export const guildConfigTable = pgTable("guild_config", {
   antiRaidEnabled:  boolean("anti_raid_enabled").default(true).notNull(),
   antiRaidThreshold: integer("anti_raid_threshold").default(10).notNull(),
   antiRaidWindowSecs: integer("anti_raid_window_secs").default(30).notNull(),
+  maxEmojis:        integer("max_emojis").default(15).notNull(),
+  linkFilterEnabled: boolean("link_filter_enabled").default(false).notNull(),
+  maxNewlines:      integer("max_newlines").default(8).notNull(),
 });
 
 export const insertGuildConfigSchema = createInsertSchema(guildConfigTable);

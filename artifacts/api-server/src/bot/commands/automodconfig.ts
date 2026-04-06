@@ -4,36 +4,41 @@ import {
   EmbedBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
-import { getGuildConfig, updateGuildConfig } from "../db.js";
+import { getGuildConfig, updateGuildConfig, getWordFilter, addBannedWord, removeBannedWord, clearWordFilter } from "../db.js";
 import { THEME } from "../theme.js";
 
 export const data = new SlashCommandBuilder()
   .setName("automod")
   .setDescription("View or configure auto-mod settings")
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+
   .addSubcommand((sub) =>
     sub.setName("status").setDescription("View current auto-mod configuration")
   )
+
   .addSubcommand((sub) =>
     sub.setName("set")
-      .setDescription("Change an auto-mod setting")
+      .setDescription("Change a numeric auto-mod threshold")
       .addStringOption((o) =>
         o.setName("setting")
           .setDescription("Which setting to change")
           .setRequired(true)
           .addChoices(
-            { name: "Spam threshold (messages per 5s)",   value: "spamThreshold" },
-            { name: "Caps threshold % (0-100)",            value: "capsThreshold" },
-            { name: "Max mentions per message",            value: "maxMentions" },
-            { name: "New account age alert (days, 0=off)", value: "newAccountDays" },
-            { name: "Anti-raid join threshold",            value: "antiRaidThreshold" },
-            { name: "Anti-raid window (seconds)",          value: "antiRaidWindowSecs" },
+            { name: "Spam threshold (messages per 5s)",    value: "spamThreshold" },
+            { name: "Caps threshold % (0–100)",             value: "capsThreshold" },
+            { name: "Max mentions per message",             value: "maxMentions" },
+            { name: "Max emojis per message (0 = off)",    value: "maxEmojis" },
+            { name: "Max newlines per message (0 = off)",  value: "maxNewlines" },
+            { name: "New account alert age (days, 0=off)", value: "newAccountDays" },
+            { name: "Anti-raid join threshold",             value: "antiRaidThreshold" },
+            { name: "Anti-raid window (seconds)",           value: "antiRaidWindowSecs" },
           )
       )
       .addIntegerOption((o) =>
-        o.setName("value").setDescription("New value for the setting").setRequired(true).setMinValue(0).setMaxValue(100)
+        o.setName("value").setDescription("New value").setRequired(true).setMinValue(0).setMaxValue(1000)
       )
   )
+
   .addSubcommand((sub) =>
     sub.setName("toggle")
       .setDescription("Enable or disable an auto-mod feature")
@@ -44,13 +49,36 @@ export const data = new SlashCommandBuilder()
           .addChoices(
             { name: "Auto-escalation (warn → mute → ban)", value: "autoEscalation" },
             { name: "Message log (deleted/edited messages)", value: "messageLogEnabled" },
-            { name: "Anti-raid protection",                 value: "antiRaidEnabled" },
+            { name: "Anti-raid protection",                  value: "antiRaidEnabled" },
+            { name: "Link filter (block all URLs)",          value: "linkFilterEnabled" },
           )
       )
   )
+
   .addSubcommand((sub) =>
     sub.setName("exempt")
       .setDescription("Toggle auto-mod exemption for the current channel")
+  )
+
+  .addSubcommandGroup((group) =>
+    group.setName("words")
+      .setDescription("Manage the custom banned word list")
+      .addSubcommand((sub) =>
+        sub.setName("add")
+          .setDescription("Add a word to the ban list")
+          .addStringOption((o) => o.setName("word").setDescription("Word to ban").setRequired(true))
+      )
+      .addSubcommand((sub) =>
+        sub.setName("remove")
+          .setDescription("Remove a word from the ban list")
+          .addStringOption((o) => o.setName("word").setDescription("Word to unban").setRequired(true))
+      )
+      .addSubcommand((sub) =>
+        sub.setName("list").setDescription("View all banned words")
+      )
+      .addSubcommand((sub) =>
+        sub.setName("clear").setDescription("Clear the entire banned word list")
+      )
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -59,25 +87,83 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  const sub = interaction.options.getSubcommand();
+  const group = interaction.options.getSubcommandGroup(false);
+  const sub   = interaction.options.getSubcommand();
+
+  // ── Word filter subcommands ─────────────────────────────────────────────────
+  if (group === "words") {
+    if (sub === "add") {
+      const word = interaction.options.getString("word", true).trim().toLowerCase();
+      const ok = await addBannedWord(interaction.guild.id, word, interaction.user.tag);
+      if (!ok) {
+        await interaction.reply({ content: `\`${word}\` is already on the ban list.`, ephemeral: true });
+        return;
+      }
+      await interaction.reply({
+        embeds: [new EmbedBuilder().setColor(THEME.success).setTitle("✅ // WORD BANNED").addFields({ name: "WORD", value: `\`${word}\`` }).setTimestamp()],
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (sub === "remove") {
+      const word = interaction.options.getString("word", true).trim().toLowerCase();
+      const ok = await removeBannedWord(interaction.guild.id, word);
+      if (!ok) {
+        await interaction.reply({ content: `\`${word}\` wasn't on the ban list.`, ephemeral: true });
+        return;
+      }
+      await interaction.reply({
+        embeds: [new EmbedBuilder().setColor(THEME.warn).setTitle("🗑️ // WORD REMOVED").addFields({ name: "WORD", value: `\`${word}\`` }).setTimestamp()],
+        ephemeral: true,
+      });
+      return;
+    }
+
+    if (sub === "list") {
+      const words = await getWordFilter(interaction.guild.id);
+      const embed = new EmbedBuilder().setColor(THEME.info).setTitle("📋 // BANNED WORDS").setTimestamp();
+      if (words.length === 0) {
+        embed.setDescription("No banned words configured.");
+      } else {
+        embed.setDescription(words.map((w) => `\`${w}\``).join("  "));
+        embed.setFooter({ text: `${words.length} word(s)` });
+      }
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+      return;
+    }
+
+    if (sub === "clear") {
+      await clearWordFilter(interaction.guild.id);
+      await interaction.reply({ content: "✅ Banned word list cleared.", ephemeral: true });
+      return;
+    }
+  }
+
   const config = await getGuildConfig(interaction.guild.id);
 
+  // ── Status ──────────────────────────────────────────────────────────────────
   if (sub === "status") {
-    const exemptIds = config.exemptChannels ? config.exemptChannels.split(",").filter(Boolean) : [];
+    const exemptIds  = config.exemptChannels ? config.exemptChannels.split(",").filter(Boolean) : [];
     const exemptList = exemptIds.length > 0 ? exemptIds.map((id) => `<#${id}>`).join(", ") : "None";
+    const wordCount  = (await getWordFilter(interaction.guild.id)).length;
 
     const embed = new EmbedBuilder()
       .setColor(THEME.info)
       .setTitle("🛡️ // AUTO-MOD CONFIG")
       .addFields(
-        { name: "SPAM THRESHOLD",    value: `${config.spamThreshold} msg/5s`, inline: true },
-        { name: "CAPS THRESHOLD",    value: `${config.capsThreshold}%`, inline: true },
-        { name: "MAX MENTIONS",      value: String(config.maxMentions), inline: true },
-        { name: "NEW ACCT ALERT",    value: config.newAccountDays > 0 ? `${config.newAccountDays} days` : "Off", inline: true },
-        { name: "ANTI-RAID",         value: config.antiRaidEnabled ? `✅ ${config.antiRaidThreshold} joins/${config.antiRaidWindowSecs}s` : "❌ Off", inline: true },
-        { name: "AUTO-ESCALATION",   value: config.autoEscalation ? "✅ On" : "❌ Off", inline: true },
-        { name: "MESSAGE LOG",       value: config.messageLogEnabled ? "✅ On" : "❌ Off", inline: true },
-        { name: "EXEMPT CHANNELS",   value: exemptList },
+        { name: "SPAM THRESHOLD",   value: `${config.spamThreshold} msg/5s`, inline: true },
+        { name: "CAPS THRESHOLD",   value: `${config.capsThreshold}%`, inline: true },
+        { name: "MAX MENTIONS",     value: String(config.maxMentions), inline: true },
+        { name: "MAX EMOJIS",       value: config.maxEmojis > 0 ? String(config.maxEmojis) : "Off", inline: true },
+        { name: "MAX NEWLINES",     value: config.maxNewlines > 0 ? String(config.maxNewlines) : "Off", inline: true },
+        { name: "NEW ACCT ALERT",   value: config.newAccountDays > 0 ? `${config.newAccountDays} days` : "Off", inline: true },
+        { name: "ANTI-RAID",        value: config.antiRaidEnabled ? `✅ ${config.antiRaidThreshold} joins/${config.antiRaidWindowSecs}s` : "❌ Off", inline: true },
+        { name: "LINK FILTER",      value: config.linkFilterEnabled ? "✅ On" : "❌ Off", inline: true },
+        { name: "AUTO-ESCALATION",  value: config.autoEscalation ? "✅ On" : "❌ Off", inline: true },
+        { name: "MESSAGE LOG",      value: config.messageLogEnabled ? "✅ On" : "❌ Off", inline: true },
+        { name: "BANNED WORDS",     value: `${wordCount} word(s)`, inline: true },
+        { name: "EXEMPT CHANNELS",  value: exemptList },
       )
       .setTimestamp();
 
@@ -85,9 +171,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
+  // ── Set ─────────────────────────────────────────────────────────────────────
   if (sub === "set") {
     const setting = interaction.options.getString("setting", true) as
-      "spamThreshold" | "capsThreshold" | "maxMentions" | "newAccountDays" | "antiRaidThreshold" | "antiRaidWindowSecs";
+      "spamThreshold" | "capsThreshold" | "maxMentions" | "maxEmojis" |
+      "maxNewlines" | "newAccountDays" | "antiRaidThreshold" | "antiRaidWindowSecs";
     const value = interaction.options.getInteger("value", true);
 
     await updateGuildConfig(interaction.guild.id, { [setting]: value });
@@ -105,9 +193,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
+  // ── Toggle ──────────────────────────────────────────────────────────────────
   if (sub === "toggle") {
     const feature = interaction.options.getString("feature", true) as
-      "autoEscalation" | "messageLogEnabled" | "antiRaidEnabled";
+      "autoEscalation" | "messageLogEnabled" | "antiRaidEnabled" | "linkFilterEnabled";
     const current = config[feature];
     await updateGuildConfig(interaction.guild.id, { [feature]: !current });
 
@@ -124,9 +213,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
+  // ── Exempt ──────────────────────────────────────────────────────────────────
   if (sub === "exempt") {
     const channelId = interaction.channelId;
-    const ids = config.exemptChannels ? config.exemptChannels.split(",").filter(Boolean) : [];
+    const ids     = config.exemptChannels ? config.exemptChannels.split(",").filter(Boolean) : [];
     const already = ids.includes(channelId);
 
     if (already) {
