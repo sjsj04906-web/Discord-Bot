@@ -2,8 +2,8 @@ import {
   SlashCommandBuilder, EmbedBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
-import { BOT_NAME } from "../theme.js";
-import { getGuildConfig, addBalance, incrementFishCount } from "../db.js";
+import { BOT_NAME, THEME } from "../theme.js";
+import { getGuildConfig, getBalance, addBalance, incrementFishCount, updateLastFish } from "../db.js";
 import { checkAndAward } from "../lib/achievements.js";
 
 const CATCHES = [
@@ -58,6 +58,8 @@ function pickCatch() {
   return CATCHES[0]!;
 }
 
+const FISH_COOLDOWN_MS = 3 * 60 * 1000; // 3 minutes
+
 export const data = new SlashCommandBuilder()
   .setName("fish")
   .setDescription("Cast your line into the digital deep");
@@ -65,9 +67,29 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) return;
   const config = await getGuildConfig(interaction.guild.id);
+  const eco    = await getBalance(interaction.guild.id, interaction.user.id);
   const em     = config.currencyEmoji;
 
+  const now = Date.now();
+  if (eco.lastFish && now - eco.lastFish.getTime() < FISH_COOLDOWN_MS) {
+    const next = eco.lastFish.getTime() + FISH_COOLDOWN_MS;
+    await interaction.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(THEME.warn)
+          .setAuthor({ name: `🎣  Deep Water Fishing  ·  ${BOT_NAME}` })
+          .setDescription(`> The signal is quiet. Cast again <t:${Math.floor(next / 1000)}:R>.`)
+          .setFooter({ text: `${BOT_NAME}  ◆  Economy` }),
+      ],
+      ephemeral: true,
+    });
+    return;
+  }
+
   await interaction.deferReply();
+
+  // Stamp cooldown immediately so a user cannot fire two concurrent requests
+  await updateLastFish(interaction.guild.id, interaction.user.id);
 
   // 10% junk chance
   if (Math.random() < 0.10) {
@@ -78,7 +100,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           .setColor(0x2D2B55)
           .setAuthor({ name: `🎣  Deep Water Fishing  ·  ${BOT_NAME}` })
           .setDescription(`You reeled in **${junk}**.\n> *Not everything in the deep is worth keeping, choom.*`)
-          .setFooter({ text: `${BOT_NAME}  ◆  Economy` }),
+          .setFooter({ text: `Cooldown: 3 min  ·  ${BOT_NAME}  ◆  Economy` }),
       ],
     });
     return;
@@ -124,7 +146,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           { name: "Sold For",  value: `**+${earned.toLocaleString()}** ${em}`, inline: true },
           { name: "Balance",   value: `${newBal.toLocaleString()} ${em}`,      inline: true },
         )
-        .setFooter({ text: `${BOT_NAME}  ◆  Economy` })
+        .setFooter({ text: `Cooldown: 3 min  ·  ${BOT_NAME}  ◆  Economy` })
         .setTimestamp(),
     ],
   });
