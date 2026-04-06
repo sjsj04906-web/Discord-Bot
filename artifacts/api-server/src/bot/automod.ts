@@ -39,10 +39,11 @@ const UNICODE_EMOJI       = /\p{Emoji_Presentation}/gu;
 const CUSTOM_EMOJI        = /<a?:[a-zA-Z0-9_]+:[0-9]+>/g;
 
 // ─── Escalation steps ─────────────────────────────────────────────────────────
-const ESCALATION: Array<{ warns: number; action: "mute" | "ban"; duration?: number; label: string }> = [
-  { warns: 3, action: "mute", duration: 10 * 60 * 1000, label: "10 min mute" },
-  { warns: 5, action: "mute", duration: 60 * 60 * 1000, label: "1 hour mute" },
-  { warns: 8, action: "ban",  label: "permanent ban" },
+const ESCALATION: Array<{ warns: number; action: "autowarn" | "mute" | "ban"; duration?: number; label: string }> = [
+  { warns: 3,  action: "autowarn",                                label: "formal warning issued" },
+  { warns: 5,  action: "mute",    duration: 10 * 60 * 1000,      label: "10 min mute" },
+  { warns: 8,  action: "mute",    duration: 60 * 60 * 1000,      label: "1 hour mute" },
+  { warns: 10, action: "ban",                                     label: "permanent ban" },
 ];
 
 // ─── Check functions ──────────────────────────────────────────────────────────
@@ -119,6 +120,34 @@ async function checkEscalation(message: Message, warningCount: number): Promise<
   if (!member) return;
 
   try {
+    if (step.action === "autowarn") {
+      // ── Formal auto-warn: DM the user and post a prominent mod-log notice ──
+      const dmEmbed = new EmbedBuilder()
+        .setColor(THEME.warn)
+        .setTitle(`⚠️ ${BOT_NAME} // FORMAL WARNING`)
+        .setDescription(
+          `You have received a **formal automated warning** in **${message.guild.name}**.\n\n` +
+          `Your account has accumulated **${warningCount} automod violations**. ` +
+          `Continued rule violations will result in a **mute** and eventually a **ban**.\n\n` +
+          `Please review the server rules.`
+        )
+        .setTimestamp();
+
+      try { await message.author.send({ embeds: [dmEmbed] }); } catch { /* DMs closed */ }
+
+      log.escalate(message.author.tag, message.guild.name, step.label, warningCount);
+
+      await sendModLog(message.guild, {
+        action: `⚠️ AUTO-ESCALATION // FORMAL WARNING ISSUED`,
+        color: THEME.warn,
+        target: message.author,
+        moderator: message.client.user!,
+        reason: `Reached ${warningCount} automod violations — user notified via DM`,
+        skipCase: true,
+      });
+      return;
+    }
+
     if (step.action === "mute" && step.duration && member.moderatable) {
       await member.timeout(step.duration, `Auto-escalation: ${warningCount} warnings`);
     } else if (step.action === "ban" && member.bannable) {
