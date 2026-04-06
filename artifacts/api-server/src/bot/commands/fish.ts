@@ -1,11 +1,10 @@
 import {
   SlashCommandBuilder, EmbedBuilder,
-  MessageFlags, type ChatInputCommandInteraction,
+  type ChatInputCommandInteraction,
 } from "discord.js";
 import { THEME, BOT_NAME } from "../theme.js";
-import { getGuildConfig, getBalance, addBalance, updateLastFish } from "../db.js";
+import { getGuildConfig, addBalance } from "../db.js";
 
-const FISH_COOLDOWN_MS = 2 * 60 * 60 * 1000;
 
 const CATCHES = [
   { name: "Glitch Byte",        emoji: "🐡", min: 5,    max: 20,   weight: 35, rarity: "Common"    },
@@ -50,36 +49,19 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) return;
   const config = await getGuildConfig(interaction.guild.id);
-  const eco    = await getBalance(interaction.guild.id, interaction.user.id);
   const em     = config.currencyEmoji;
-
-  const now = Date.now();
-  if (eco.lastFish && now - eco.lastFish.getTime() < FISH_COOLDOWN_MS) {
-    const next = eco.lastFish.getTime() + FISH_COOLDOWN_MS;
-    await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(THEME.warn)
-          .setDescription(`🎣 The waters are still. Come back <t:${Math.floor(next / 1000)}:R>!`),
-      ],
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
 
   await interaction.deferReply();
 
   // 10% junk chance
   if (Math.random() < 0.10) {
     const junk = JUNK[Math.floor(Math.random() * JUNK.length)]!;
-    await updateLastFish(interaction.guild.id, interaction.user.id);
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()
           .setColor(THEME.muted)
           .setAuthor({ name: `🎣  Fishing  ·  ${BOT_NAME}` })
-          .setDescription(`You reeled in... **${junk}**.\nBetter luck next time, choom.`)
-          .setFooter({ text: `Next cast available in 2 hours` }),
+          .setDescription(`You reeled in... **${junk}**.\nBetter luck next time, choom.`),
       ],
     });
     return;
@@ -88,7 +70,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const catch_ = pickCatch();
   const earned = Math.floor(Math.random() * (catch_.max - catch_.min + 1)) + catch_.min;
 
-  await updateLastFish(interaction.guild.id, interaction.user.id);
   const newBal = await addBalance(interaction.guild.id, interaction.user.id, earned);
 
   await interaction.editReply({
@@ -102,7 +83,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           { name: "Sold For",    value: `+${earned.toLocaleString()} ${em}`, inline: true },
           { name: "New Balance", value: `${newBal.toLocaleString()} ${em}`,  inline: true },
         )
-        .setFooter({ text: `Next cast available in 2 hours` })
         .setTimestamp(),
     ],
   });
