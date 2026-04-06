@@ -39,15 +39,11 @@ const RULES = [
     body:  "Do not impersonate other members, staff, public figures, or bots. This includes similar usernames, avatars, or copying someone's display style to mislead others.",
   },
   {
-    title: "8 · English Only (in General Channels)",
-    body:  "Please communicate in English in the main channels so staff can moderate effectively. Language-specific channels may exist for other languages.",
-  },
-  {
-    title: "9 · Follow Discord's Terms of Service",
+    title: "8 · Follow Discord's Terms of Service",
     body:  "All members must comply with [Discord's Terms of Service](https://discord.com/terms) and [Community Guidelines](https://discord.com/guidelines) at all times.",
   },
   {
-    title: "10 · Staff Decisions Are Final",
+    title: "9 · Staff Decisions Are Final",
     body:  "Respect all decisions made by moderators and admins. If you disagree with an action taken, reach out privately via modmail — do not argue publicly in channels.",
   },
 ];
