@@ -76,6 +76,7 @@ import * as market from "./market.js";
 import * as bounty from "./bounty.js";
 import * as lottery from "./lottery.js";
 import * as quests from "./quests.js";
+import * as stocks from "./stocks.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -106,4 +107,5 @@ export const allCommands: SlashCommand[] = [
   achievements, prestige,
   autoresponder,
   market, bounty, lottery, quests,
+  stocks,
 ];

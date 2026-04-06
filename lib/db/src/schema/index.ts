@@ -17,3 +17,4 @@ export * from "./suggestions";
 export * from "./economy";
 export * from "./autoresponders";
 export * from "./features";
+export * from "./stocks";

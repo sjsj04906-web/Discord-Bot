@@ -42,6 +42,8 @@ import { restorePendingTempBans } from "./tempbanScheduler.js";
 import { restorePendingTempRoles } from "./temproleScheduler.js";
 import { startWarnExpiryScheduler } from "./warnExpiryScheduler.js";
 import { startRetentionScheduler } from "./retentionScheduler.js";
+import { startStockScheduler } from "./stockScheduler.js";
+import { bufferSentiment } from "./stockDb.js";
 import { getCommandRoles, getGuildConfig, eraseUserData } from "./db.js";
 import { clearAfk, getAfk, isAfk } from "./utils/afkStore.js";
 import { logger } from "../lib/logger.js";
@@ -78,6 +80,7 @@ export function startBot(): void {
     startReminderScheduler(readyClient);
     startInterestScheduler(readyClient);
     runRetroactiveCheck(readyClient).catch(() => {});
+    startStockScheduler(readyClient);
 
     // Lottery draw checker — runs every 10 minutes
     setInterval(() => checkLotteryDraws(readyClient).catch(() => {}), 10 * 60_000);
@@ -497,6 +500,7 @@ export function startBot(): void {
     await handleHarassmentDetection(message);
     await handleXp(message);
     await handleCounting(message);
+    if (message.guildId) bufferSentiment(message.guildId);
   });
 
   client.on(Events.MessageDelete, async (message) => {
