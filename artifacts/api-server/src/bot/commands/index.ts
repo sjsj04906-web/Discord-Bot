@@ -37,6 +37,7 @@ import * as reactionrole from "./reactionrole.js";
 import * as exportwarns from "./exportwarns.js";
 import * as autorole from "./autorole.js";
 import * as modmailcmd from "./modmailcmd.js";
+import * as messagelog from "./messagelog.js";
 import * as softban from "./softban.js";
 import * as snipe from "./snipe.js";
 import * as afk from "./afk.js";
@@ -57,6 +58,6 @@ export const allCommands: SlashCommand[] = [
   automodconfig, permissions,
   history, report, stats, antiraid,
   caseCmd, welcome, ticket, temprole, reactionrole, exportwarns,
-  autorole, modmailcmd,
+  autorole, modmailcmd, messagelog,
   snipe, afk, verify, serverstats,
 ];

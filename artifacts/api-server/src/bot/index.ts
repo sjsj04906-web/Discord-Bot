@@ -2,7 +2,7 @@ import { Events, type Interaction, type GuildMember, PermissionFlagsBits, EmbedB
 import { client, commands } from "./client.js";
 import { allCommands } from "./commands/index.js";
 import { handleAutoMod } from "./automod.js";
-import { handleMessageDelete, handleMessageUpdate } from "./events/messageLog.js";
+import { handleMessageDelete, handleMessageUpdate, handleMessageBulkDelete } from "./events/messageLog.js";
 import { handleHarassmentDetection } from "./harassment.js";
 import { handleAntiRaid } from "./events/antiRaid.js";
 import { handleNewAccount, handleDehoist, handleAutoRole, handleRoleRestore } from "./events/memberJoin.js";
@@ -203,6 +203,11 @@ export function startBot(): void {
   client.on(Events.MessageDelete, async (message) => {
     await handleAntiGhostping(message);
     await handleMessageDelete(message);
+  });
+
+  client.on(Events.MessageBulkDelete, async (messages, channel) => {
+    if (channel.isDMBased()) return;
+    await handleMessageBulkDelete(messages as Parameters<typeof handleMessageBulkDelete>[0], channel as import("discord.js").TextChannel);
   });
 
   client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {

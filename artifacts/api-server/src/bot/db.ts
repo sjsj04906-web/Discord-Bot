@@ -246,6 +246,7 @@ export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
     exemptChannels: "",
     autoEscalation: true,
     messageLogEnabled: true,
+    messageLogChannelId: "",
     antiRaidEnabled: true,
     antiRaidThreshold: 10,
     antiRaidWindowSecs: 30,
