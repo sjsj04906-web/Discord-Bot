@@ -64,14 +64,6 @@ export function startBot(): void {
     startServerStatsScheduler(readyClient);
     startReminderScheduler(readyClient);
     await initInviteTracker(readyClient);
-
-    // Set the bot's managed role colour to black in every guild
-    for (const guild of readyClient.guilds.cache.values()) {
-      const botRole = guild.roles.cache.find((r) => r.managed && r.name === readyClient.user.username);
-      if (botRole && botRole.color !== 0x000000) {
-        await botRole.setColor(0x000000, "GL1TCH branding").catch(() => {});
-      }
-    }
   });
 
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
