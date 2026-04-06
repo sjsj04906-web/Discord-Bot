@@ -23,7 +23,7 @@ import {
 import { THEME, BOT_NAME } from "../theme.js";
 
 const MAIL_CHANNEL_PREFIX = "mail-";
-const TRIGGERS = ["!mail", "!modmail", "!contact", "!help"];
+const TRIGGERS = ["!mail", "!modmail", "!contact", "!help", "!report"];
 const PENDING_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // In-memory: userId → { guildId, timestamp }
