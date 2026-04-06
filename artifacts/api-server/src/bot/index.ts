@@ -26,7 +26,7 @@ import { restorePendingTempBans } from "./tempbanScheduler.js";
 import { restorePendingTempRoles } from "./temproleScheduler.js";
 import { startWarnExpiryScheduler } from "./warnExpiryScheduler.js";
 import { startRetentionScheduler } from "./retentionScheduler.js";
-import { getCommandRoles, getGuildConfig } from "./db.js";
+import { getCommandRoles, getGuildConfig, eraseUserData } from "./db.js";
 import { clearAfk, getAfk, isAfk } from "./utils/afkStore.js";
 import { logger } from "../lib/logger.js";
 import { THEME, BOT_NAME } from "./theme.js";
@@ -97,6 +97,96 @@ export function startBot(): void {
         ],
         flags: MessageFlags.Ephemeral,
       });
+      return;
+    }
+
+    // ── GDPR erasure request — Approve ───────────────────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith("mydata_approve_")) {
+      const [, , userId, guildId] = interaction.customId.split("_");
+      if (!interaction.guild || !userId || !guildId) return;
+
+      const staffMember = interaction.guild.members.cache.get(interaction.user.id);
+      const isStaff = interaction.guild.ownerId === interaction.user.id
+        || staffMember?.permissions.has(PermissionFlagsBits.ManageGuild);
+      if (!isStaff) {
+        await interaction.reply({ content: "You need **Manage Server** to action this request.", flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      await interaction.deferUpdate();
+      const counts = await eraseUserData(guildId, userId);
+      const total  = Object.values(counts).reduce((s, n) => s + n, 0);
+
+      const done = new EmbedBuilder()
+        .setColor(THEME.success)
+        .setAuthor({ name: `✅  Erasure Approved  ·  ${BOT_NAME}` })
+        .setDescription(`**${total} record${total !== 1 ? "s" : ""}** permanently deleted for user \`${userId}\`.`)
+        .setFooter({ text: `Approved by ${interaction.user.tag}` })
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [...(interaction.message.embeds ?? []), done], components: [] });
+
+      // DM the requester
+      const target = await interaction.client.users.fetch(userId).catch(() => null);
+      if (target) {
+        await target.send({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(THEME.success)
+              .setAuthor({ name: `✅  Erasure Request Approved  ·  ${BOT_NAME}` })
+              .setTitle("Your data has been deleted")
+              .setDescription(`Your data erasure request for **${interaction.guild.name}** has been approved. **${total} record${total !== 1 ? "s" : ""}** were permanently removed.`)
+              .setFooter({ text: `${BOT_NAME}  ·  GDPR Article 17` })
+              .setTimestamp(),
+          ],
+        }).catch(() => {});
+      }
+      return;
+    }
+
+    // ── GDPR erasure request — Deny ───────────────────────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith("mydata_deny_")) {
+      const [, , userId, guildId] = interaction.customId.split("_");
+      if (!interaction.guild || !userId || !guildId) return;
+
+      const staffMember = interaction.guild.members.cache.get(interaction.user.id);
+      const isStaff = interaction.guild.ownerId === interaction.user.id
+        || staffMember?.permissions.has(PermissionFlagsBits.ManageGuild);
+      if (!isStaff) {
+        await interaction.reply({ content: "You need **Manage Server** to action this request.", flags: MessageFlags.Ephemeral });
+        return;
+      }
+
+      await interaction.deferUpdate();
+
+      const done = new EmbedBuilder()
+        .setColor(THEME.ban)
+        .setAuthor({ name: `❌  Erasure Denied  ·  ${BOT_NAME}` })
+        .setDescription(`Erasure request for user \`${userId}\` was denied. Records retained.`)
+        .setFooter({ text: `Denied by ${interaction.user.tag}` })
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [...(interaction.message.embeds ?? []), done], components: [] });
+
+      // DM the requester
+      const target = await interaction.client.users.fetch(userId).catch(() => null);
+      if (target) {
+        await target.send({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(THEME.ban)
+              .setAuthor({ name: `❌  Erasure Request Denied  ·  ${BOT_NAME}` })
+              .setTitle("Your request has been reviewed")
+              .setDescription(
+                `Your data erasure request for **${interaction.guild.name}** has been reviewed and denied.\n\n` +
+                `Your moderation records will be retained. Under GDPR, you have the right to lodge a complaint ` +
+                `with your national data protection authority if you believe this decision is unlawful.`
+              )
+              .setFooter({ text: `${BOT_NAME}  ·  GDPR Article 17` })
+              .setTimestamp(),
+          ],
+        }).catch(() => {});
+      }
       return;
     }
 
