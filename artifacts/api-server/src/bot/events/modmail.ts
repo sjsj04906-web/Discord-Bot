@@ -1,94 +1,143 @@
 import {
   type Message,
+  type PartialMessage,
   EmbedBuilder,
   ChannelType,
   type TextChannel,
   type Guild,
   PermissionFlagsBits,
 } from "discord.js";
-import { getGuildConfig, openModMailSession, closeModMailSession, getModMailSessionByUser, getModMailSessionByChannel } from "../db.js";
+import {
+  getGuildConfig,
+  openModMailSession,
+  closeModMailSession,
+  getModMailSessionByUser,
+  getModMailSessionByChannel,
+} from "../db.js";
 import { THEME, BOT_NAME } from "../theme.js";
 
 const MAIL_CHANNEL_PREFIX = "mail-";
 
-// ── Forward a DM to the mod channel ────────────────────────────────────────────
+// ── Forward a DM to the mod channel ──────────────────────────────────────────
 async function forwardDmToMod(message: Message, guild: Guild): Promise<void> {
   const config = await getGuildConfig(guild.id);
   if (!config.modMailChannelId) return;
 
-  const modChannel = guild.channels.cache.get(config.modMailChannelId) as TextChannel | undefined;
+  // Use fetch — cache.get misses channels not yet cached after restart
+  const modChannel = await guild.channels.fetch(config.modMailChannelId).catch(() => null) as TextChannel | null;
   if (!modChannel) return;
 
-  const user   = message.author;
+  const user     = message.author;
   const safeName = user.username.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20) || "user";
-  const chanName  = `${MAIL_CHANNEL_PREFIX}${safeName}`;
+  const chanName = `${MAIL_CHANNEL_PREFIX}${safeName}`;
 
-  // Find or create the user's mail channel
-  let mailChannel = guild.channels.cache.find(
-    (c) => c.name === chanName && c.isTextBased()
-  ) as TextChannel | undefined;
+  // Check for an existing open session in DB
+  let existingSession = await getModMailSessionByUser(guild.id, user.id);
 
-  const existingSession = await getModMailSessionByUser(guild.id, user.id);
+  // If a session exists, re-use its channel (even if not in cache)
+  let mailChannel: TextChannel | null = null;
+  if (existingSession) {
+    mailChannel = await guild.channels.fetch(existingSession.channelId).catch(() => null) as TextChannel | null;
+    // If the channel was manually deleted, clear the stale session
+    if (!mailChannel) {
+      await closeModMailSession(existingSession.id);
+      existingSession = null;
+    }
+  }
 
-  if (!mailChannel || !existingSession) {
-    // Create a new private channel under the mod mail channel's category
+  // No open session — create a new mail channel
+  if (!mailChannel) {
     const category = modChannel.parentId;
 
     const modRoles = guild.roles.cache.filter((r) =>
       ["mod", "moderator", "staff", "admin"].some((h) => r.name.toLowerCase().includes(h))
     );
 
+    const permissionOverwrites: Parameters<Guild["channels"]["create"]>[0]["permissionOverwrites"] = [
+      { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+      {
+        id: message.client.user!.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ManageChannels,
+          PermissionFlagsBits.ReadMessageHistory,
+        ],
+      },
+    ];
+
+    for (const role of modRoles.values()) {
+      permissionOverwrites.push({
+        id: role.id,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory,
+        ],
+      });
+    }
+
+    // If no mod roles matched, also allow the channel owner (administrator)
+    // so at least someone can see it
+    if (modRoles.size === 0) {
+      const adminRoles = guild.roles.cache.filter((r) => r.permissions.has(PermissionFlagsBits.Administrator));
+      for (const role of adminRoles.values()) {
+        permissionOverwrites.push({
+          id: role.id,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory],
+        });
+      }
+    }
+
     mailChannel = await guild.channels.create({
       name: chanName,
       type: ChannelType.GuildText,
       parent: category ?? undefined,
-      permissionOverwrites: [
-        { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
-        { id: message.client.user!.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels] },
-        ...modRoles.map((r) => ({ id: r.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] })),
-      ],
-      topic: `Mod mail from ${user.tag} (${user.id})`,
+      permissionOverwrites,
+      topic: `Mod mail thread · ${user.tag} (${user.id})`,
     }) as TextChannel;
 
     await openModMailSession(guild.id, user.id, user.tag, mailChannel.id);
 
-    // Opening notice
+    // Opening embed in the new mail channel
     const openEmbed = new EmbedBuilder()
       .setColor(THEME.info)
-      .setTitle(`📬 // MOD MAIL — ${user.tag}`)
+      .setAuthor({ name: `📬  Mod Mail Opened  ·  ${BOT_NAME}` })
+      .setTitle(user.tag)
+      .setURL(`https://discord.com/users/${user.id}`)
       .setThumbnail(user.displayAvatarURL())
-      .setDescription(`New mod mail thread opened by ${user}.`)
       .addFields(
-        { name: "USER ID",  value: `\`${user.id}\``, inline: true },
-        { name: "ACCOUNT",  value: `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`, inline: true },
+        { name: "User ID",      value: `\`${user.id}\``, inline: true },
+        { name: "Account Age",  value: `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`, inline: true },
       )
-      .setFooter({ text: `Use /modmail reply to respond • /modmail close to close` })
+      .setDescription("Reply in this channel — every message you send will be forwarded to the user's DMs.\nUse `/modmail close` to resolve and delete this thread.")
       .setTimestamp();
 
     await mailChannel.send({ embeds: [openEmbed] });
 
-    // Notify user the thread is open
+    // Acknowledge to the user
     await user.send({
       embeds: [
         new EmbedBuilder()
           .setColor(THEME.info)
-          .setTitle(`📬 ${BOT_NAME} // MOD MAIL OPENED`)
-          .setDescription(`Your message has been received by the moderation team of **${guild.name}**. They will respond here shortly.`)
+          .setAuthor({ name: `📬  Mod Mail  ·  ${BOT_NAME}` })
+          .setTitle(`Message received — ${guild.name}`)
+          .setDescription("Your message has been received by the moderation team. They will reply here shortly.\n\nYou can continue sending messages and they will all be forwarded.")
           .setTimestamp(),
       ],
     }).catch(() => {});
   }
 
-  // Forward the message
+  // Forward the message to the mail channel
   const fwdEmbed = new EmbedBuilder()
     .setColor(0x5865f2)
-    .setAuthor({ name: `${user.tag}`, iconURL: user.displayAvatarURL() })
+    .setAuthor({ name: user.tag, iconURL: user.displayAvatarURL() })
     .setDescription(message.content || "_[no text content]_")
     .setTimestamp();
 
   if (message.attachments.size > 0) {
     fwdEmbed.addFields({
-      name: "ATTACHMENTS",
+      name: "Attachments",
       value: message.attachments.map((a) => a.url).join("\n").slice(0, 500),
     });
   }
@@ -96,11 +145,9 @@ async function forwardDmToMod(message: Message, guild: Guild): Promise<void> {
   await mailChannel.send({ embeds: [fwdEmbed] }).catch(() => {});
 }
 
-// ── Forward a mod reply from the mail channel back to the user ─────────────────
+// ── Forward a mod reply back to the user ──────────────────────────────────────
 async function forwardModReplyToUser(message: Message): Promise<void> {
-  if (!message.guild) return;
-  if (!message.channel.isTextBased()) return;
-  if (!(message.channel as TextChannel).name?.startsWith(MAIL_CHANNEL_PREFIX)) return;
+  if (!message.guild || !message.content) return;
 
   const session = await getModMailSessionByChannel(message.channelId);
   if (!session || session.status === "closed") return;
@@ -110,38 +157,38 @@ async function forwardModReplyToUser(message: Message): Promise<void> {
 
   const replyEmbed = new EmbedBuilder()
     .setColor(THEME.success)
-    .setAuthor({ name: `${BOT_NAME} // Mod Team`, iconURL: message.guild.iconURL() ?? undefined })
-    .setDescription(message.content || "_[no text content]_")
+    .setAuthor({ name: `Mod Team  ·  ${message.guild.name}`, iconURL: message.guild.iconURL() ?? undefined })
+    .setDescription(message.content)
     .setTimestamp();
 
-  await user.send({ embeds: [replyEmbed] }).catch(() => {
-    message.react("❌").catch(() => {});
-  });
-
-  await message.react("✅").catch(() => {});
+  const sent = await user.send({ embeds: [replyEmbed] }).catch(() => null);
+  await message.react(sent ? "✅" : "❌").catch(() => {});
 }
 
-// ── Main DM handler ────────────────────────────────────────────────────────────
-export async function handleDirectMessage(message: Message): Promise<void> {
-  if (message.author.bot) return;
-  if (message.guild) return; // not a DM
+// ── DM handler (called from index.ts MessageCreate for non-guild messages) ────
+export async function handleDirectMessage(message: Message | PartialMessage): Promise<void> {
+  // Fetch partial messages so author/content are available
+  const msg = message.partial ? await message.fetch().catch(() => null) : message;
+  if (!msg || !msg.author || msg.author.bot) return;
+  if (msg.guild) return;
 
-  // Find the first guild where this bot has a modmail channel configured
-  for (const guild of message.client.guilds.cache.values()) {
+  for (const guild of msg.client.guilds.cache.values()) {
     const config = await getGuildConfig(guild.id).catch(() => null);
     if (config?.modMailChannelId) {
-      await forwardDmToMod(message, guild).catch(() => {});
+      await forwardDmToMod(msg as Message, guild).catch((err) => {
+        console.error("[modmail] forwardDmToMod error:", err);
+      });
       return;
     }
   }
 }
 
-// ── Mod channel message handler (reply forwarding) ─────────────────────────────
+// ── Guild message handler: forward mod replies in mail- channels ──────────────
 export async function handleModMailReply(message: Message): Promise<void> {
-  if (message.author.bot) return;
-  if (!message.guild) return;
+  if (message.author.bot || !message.guild) return;
   const ch = message.channel as TextChannel;
   if (!ch.name?.startsWith(MAIL_CHANNEL_PREFIX)) return;
 
   await forwardModReplyToUser(message).catch(() => {});
 }
+

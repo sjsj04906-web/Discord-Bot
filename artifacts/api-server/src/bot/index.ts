@@ -93,7 +93,7 @@ export function startBot(): void {
 
   client.on(Events.MessageCreate, async (message) => {
     // ── Mod mail: DM forwarding ──────────────────────────────────────────────
-    if (!message.guild) {
+    if (!message.guildId) {
       await handleDirectMessage(message);
       return;
     }
