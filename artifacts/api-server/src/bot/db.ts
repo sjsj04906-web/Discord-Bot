@@ -1,5 +1,5 @@
 import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable } from "@workspace/db";
-import { eq, and, desc, count, sql } from "drizzle-orm";
+import { eq, and, desc, count, sql, inArray } from "drizzle-orm";
 import type { GuildConfig } from "@workspace/db";
 
 // ─── Warnings ─────────────────────────────────────────────────────────────────
@@ -33,6 +33,14 @@ export async function removeWarning(id: number, guildId: string): Promise<boolea
   if (rows.length === 0) return false;
   await db.delete(warningsTable).where(eq(warningsTable.id, id));
   return true;
+}
+
+export async function removeWarningsByIds(ids: number[], guildId: string): Promise<number> {
+  if (ids.length === 0) return 0;
+  await db.delete(warningsTable).where(
+    and(eq(warningsTable.guildId, guildId), inArray(warningsTable.id, ids))
+  );
+  return ids.length;
 }
 
 // ─── Notes ────────────────────────────────────────────────────────────────────
