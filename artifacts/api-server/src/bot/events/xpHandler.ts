@@ -25,7 +25,9 @@ export async function handleXp(message: Message): Promise<void> {
   if (message.content.startsWith("/")) return;
 
   const config = await getGuildConfig(message.guild.id).catch(() => null);
-  if (!config?.levelingEnabled) return;
+  if (!config) return;
+  // Treat null/undefined as enabled — only skip if explicitly set to false
+  if (config.levelingEnabled === false) return;
 
   const key = `${message.guild.id}:${message.author.id}`;
   const lastAwarded = cooldowns.get(key) ?? 0;
@@ -35,6 +37,8 @@ export async function handleXp(message: Message): Promise<void> {
 
   const earned = Math.floor(Math.random() * (XP_MAX - XP_MIN + 1)) + XP_MIN;
   const { oldLevel, newLevel, newXp } = await addXp(message.guild.id, message.author.id, earned);
+
+  logger.info({ userId: message.author.id, earned, oldLevel, newLevel, newXp }, "XP awarded");
 
   if (newLevel <= oldLevel) return;
 

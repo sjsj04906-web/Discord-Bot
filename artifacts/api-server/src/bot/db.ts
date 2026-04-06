@@ -264,6 +264,10 @@ export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
     verifyRoleId: "",
     memberCountChannelId: "",
     humanCountChannelId: "",
+    levelingEnabled: true,
+    levelUpChannelId: "",
+    voiceLogChannelId: "",
+    joinLogChannelId: "",
   };
 
   await db.insert(guildConfigTable).values(defaults).onConflictDoNothing();
