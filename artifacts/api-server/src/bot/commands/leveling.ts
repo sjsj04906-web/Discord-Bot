@@ -114,17 +114,34 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   if (sub === "setup") {
     await interaction.deferReply();
 
-    const created: string[] = [];
-    const skipped: string[] = [];
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
     const existing = await getLevelRoles(interaction.guild.id);
     const existingLevels = new Set(existing.map((r) => r.level));
+    const toCreate = DEFAULT_LEVEL_ROLES.filter((d) => !existingLevels.has(d.level));
+    const skippedCount = DEFAULT_LEVEL_ROLES.length - toCreate.length;
 
-    for (const def of DEFAULT_LEVEL_ROLES) {
-      if (existingLevels.has(def.level)) {
-        skipped.push(`Lv ${def.level} — ${def.name} (already exists)`);
-        continue;
-      }
+    if (toCreate.length === 0) {
+      await interaction.editReply({ content: `All ${DEFAULT_LEVEL_ROLES.length} level roles already exist. Use \`/leveling roles\` to view them.` });
+      return;
+    }
+
+    // Send initial progress message
+    await interaction.editReply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(THEME.warn)
+          .setAuthor({ name: `⚙️  Creating Roles  ·  ${BOT_NAME}` })
+          .setDescription(`Creating **${toCreate.length}** roles one by one (rate limit safe)...\n\nThis will take around **${Math.ceil(toCreate.length * 1.2)}s** — please wait.`)
+          .setFooter({ text: `0 / ${toCreate.length} done` }),
+      ],
+    });
+
+    const created: string[] = [];
+    const failed:  string[] = [];
+
+    for (let i = 0; i < toCreate.length; i++) {
+      const def = toCreate[i]!;
       try {
         const role = await interaction.guild.roles.create({
           name:   def.name,
@@ -132,21 +149,69 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           reason: `GL1TCH leveling setup — Level ${def.level} role`,
         });
         await saveLevelRole(interaction.guild.id, def.level, role.id, def.name);
-        created.push(`Lv **${def.level}** — <@&${role.id}> (${def.name})`);
-      } catch {
-        skipped.push(`Lv ${def.level} — ${def.name} (failed, check bot role permissions)`);
+        created.push(`Lv **${def.level}** — <@&${role.id}>`);
+      } catch (err: any) {
+        // If rate limited, back off longer and retry once
+        if (err?.status === 429 || String(err).includes("rate")) {
+          await sleep(5000);
+          try {
+            const role = await interaction.guild.roles.create({
+              name:   def.name,
+              color:  def.color,
+              reason: `GL1TCH leveling setup — Level ${def.level} role (retry)`,
+            });
+            await saveLevelRole(interaction.guild.id, def.level, role.id, def.name);
+            created.push(`Lv **${def.level}** — <@&${role.id}>`);
+          } catch {
+            failed.push(`Lv ${def.level} — ${def.name}`);
+          }
+        } else {
+          failed.push(`Lv ${def.level} — ${def.name}`);
+        }
       }
+
+      // Update progress every 5 roles
+      if ((i + 1) % 5 === 0 || i === toCreate.length - 1) {
+        await interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(THEME.warn)
+              .setAuthor({ name: `⚙️  Creating Roles  ·  ${BOT_NAME}` })
+              .setDescription(`Creating **${toCreate.length}** roles...\n\n✅ ${created.length} created  ·  ❌ ${failed.length} failed`)
+              .setFooter({ text: `${i + 1} / ${toCreate.length} done` }),
+          ],
+        }).catch(() => {});
+      }
+
+      // Rate-limit safe delay between each role (1.2s)
+      if (i < toCreate.length - 1) await sleep(1200);
     }
 
     const embed = new EmbedBuilder()
-      .setColor(THEME.success)
-      .setAuthor({ name: `✅  Leveling Setup Complete  ·  ${BOT_NAME}` })
-      .setDescription("All level roles have been created and registered. Members will automatically receive their role when they hit the required level.")
+      .setColor(failed.length === 0 ? THEME.success : THEME.warn)
+      .setAuthor({ name: `${failed.length === 0 ? "✅" : "⚠️"}  Leveling Setup Done  ·  ${BOT_NAME}` })
+      .setDescription(
+        `**${created.length}** role${created.length !== 1 ? "s" : ""} created` +
+        (skippedCount > 0 ? ` · **${skippedCount}** already existed` : "") +
+        (failed.length > 0 ? ` · **${failed.length}** failed` : "")
+      )
       .setFooter({ text: `${BOT_NAME}  ·  XP is earned from chatting (15-25 per message, 60s cooldown)` })
       .setTimestamp();
 
-    if (created.length > 0) embed.addFields({ name: "✅ Roles Created", value: created.join("\n") });
-    if (skipped.length > 0) embed.addFields({ name: "⏭️ Skipped", value: skipped.join("\n") });
+    if (created.length > 0) {
+      // Split into chunks to stay under Discord's 1024 char field limit
+      const chunks: string[][] = [[]];
+      for (const line of created) {
+        if (chunks[chunks.length - 1]!.join("\n").length + line.length > 900) chunks.push([]);
+        chunks[chunks.length - 1]!.push(line);
+      }
+      chunks.forEach((chunk, i) =>
+        embed.addFields({ name: i === 0 ? "✅ Created" : "✅ Created (cont.)", value: chunk.join("\n") })
+      );
+    }
+    if (failed.length > 0) {
+      embed.addFields({ name: "❌ Failed", value: failed.join("\n").slice(0, 1024) });
+    }
 
     await interaction.editReply({ embeds: [embed] });
     return;
