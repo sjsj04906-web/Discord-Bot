@@ -49,6 +49,9 @@ import * as serverstats from "./serverstats.js";
 import * as mydata from "./mydata.js";
 import * as modstats from "./modstats.js";
 import * as remind from "./remind.js";
+import * as rank from "./rank.js";
+import * as leaderboard from "./leaderboard.js";
+import * as leveling from "./leveling.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -69,4 +72,7 @@ export const allCommands: SlashCommand[] = [
   mydata,
   modstats,
   remind,
+  rank,
+  leaderboard,
+  leveling,
 ];

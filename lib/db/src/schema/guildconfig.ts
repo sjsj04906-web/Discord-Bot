@@ -32,6 +32,8 @@ export const guildConfigTable = pgTable("guild_config", {
   dataRetentionDays:      integer("data_retention_days").default(365).notNull(),
   voiceLogChannelId:      text("voice_log_channel_id").default("").notNull(),
   joinLogChannelId:       text("join_log_channel_id").default("").notNull(),
+  levelingEnabled:        boolean("leveling_enabled").default(true).notNull(),
+  levelUpChannelId:       text("level_up_channel_id").default("").notNull(),
 });
 
 export const insertGuildConfigSchema = createInsertSchema(guildConfigTable);

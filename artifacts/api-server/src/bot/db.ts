@@ -1,5 +1,5 @@
-import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable, roleBackupsTable, modMailSessionsTable, remindersTable } from "@workspace/db";
-import { eq, and, desc, count, sql, inArray, lt, gt, lte } from "drizzle-orm";
+import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable, roleBackupsTable, modMailSessionsTable, remindersTable, xpTable, levelRolesTable } from "@workspace/db";
+import { eq, and, desc, count, sql, inArray, lt, gt, lte, asc } from "drizzle-orm";
 import type { GuildConfig } from "@workspace/db";
 
 // ─── Warnings ─────────────────────────────────────────────────────────────────
@@ -498,6 +498,8 @@ export async function purgeOldRecords(guildId: string, days: number): Promise<nu
   return total;
 }
 
+export const setGuildConfig = updateGuildConfig;
+
 // ─── Mod Stats ────────────────────────────────────────────────────────────────
 export async function getModStats(guildId: string) {
   const rows = await db
@@ -551,6 +553,90 @@ export async function getPendingReminders() {
 
 export async function markReminderSent(id: number) {
   await db.update(remindersTable).set({ sent: true }).where(eq(remindersTable.id, id));
+}
+
+// ─── XP / Leveling ────────────────────────────────────────────────────────────
+export async function getOrCreateXp(guildId: string, userId: string) {
+  const existing = await db.select().from(xpTable)
+    .where(and(eq(xpTable.guildId, guildId), eq(xpTable.userId, userId)))
+    .limit(1);
+  if (existing.length > 0) return existing[0]!;
+
+  const [row] = await db.insert(xpTable)
+    .values({ guildId, userId, xp: 0, level: 0, messageCount: 0 })
+    .onConflictDoNothing()
+    .returning();
+  return row ?? { guildId, userId, xp: 0, level: 0, messageCount: 0, id: 0, lastMessage: null, createdAt: new Date() };
+}
+
+export async function addXp(
+  guildId: string,
+  userId: string,
+  amount: number
+): Promise<{ oldLevel: number; newLevel: number; newXp: number }> {
+  const record = await getOrCreateXp(guildId, userId);
+  const oldLevel = record.level;
+  const newXp = record.xp + amount;
+
+  const { levelFromXp } = await import("./utils/xpMath.js");
+  const newLevel = levelFromXp(newXp);
+
+  await db.update(xpTable)
+    .set({ xp: newXp, level: newLevel, messageCount: record.messageCount + 1, lastMessage: new Date() })
+    .where(and(eq(xpTable.guildId, guildId), eq(xpTable.userId, userId)));
+
+  return { oldLevel, newLevel, newXp };
+}
+
+export async function setUserXp(guildId: string, userId: string, amount: number) {
+  const { levelFromXp } = await import("./utils/xpMath.js");
+  const newLevel = levelFromXp(amount);
+  await db.insert(xpTable)
+    .values({ guildId, userId, xp: amount, level: newLevel, messageCount: 0 })
+    .onConflictDoUpdate({
+      target: [xpTable.guildId, xpTable.userId],
+      set: { xp: amount, level: newLevel },
+    });
+}
+
+export async function resetUserXp(guildId: string, userId: string) {
+  await db.update(xpTable)
+    .set({ xp: 0, level: 0, messageCount: 0 })
+    .where(and(eq(xpTable.guildId, guildId), eq(xpTable.userId, userId)));
+}
+
+export async function getGuildRank(guildId: string, userId: string): Promise<number> {
+  const result = await db
+    .select({ userId: xpTable.userId, xp: xpTable.xp })
+    .from(xpTable)
+    .where(eq(xpTable.guildId, guildId))
+    .orderBy(desc(xpTable.xp));
+  const idx = result.findIndex((r) => r.userId === userId);
+  return idx === -1 ? result.length + 1 : idx + 1;
+}
+
+export async function getLeaderboard(guildId: string, limit = 10, offset = 0) {
+  return db.select()
+    .from(xpTable)
+    .where(eq(xpTable.guildId, guildId))
+    .orderBy(desc(xpTable.xp))
+    .limit(limit)
+    .offset(offset);
+}
+
+export async function getLevelRoles(guildId: string) {
+  return db.select().from(levelRolesTable)
+    .where(eq(levelRolesTable.guildId, guildId))
+    .orderBy(asc(levelRolesTable.level));
+}
+
+export async function saveLevelRole(guildId: string, level: number, roleId: string, roleName: string) {
+  await db.insert(levelRolesTable)
+    .values({ guildId, level, roleId, roleName })
+    .onConflictDoUpdate({
+      target: [levelRolesTable.guildId, levelRolesTable.level],
+      set: { roleId, roleName },
+    });
 }
 
 // ─── GDPR: all guilds with retention configured ───────────────────────────────

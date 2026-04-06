@@ -13,6 +13,7 @@ import { handleDirectMessage, handleModMailReply, handleModMailButtonInteraction
 import { handleVoiceStateUpdate } from "./events/voiceLog.js";
 import { handleMemberJoinLog, handleMemberLeaveLog } from "./events/joinLeaveLog.js";
 import { startReminderScheduler } from "./reminderScheduler.js";
+import { handleXp } from "./events/xpHandler.js";
 import { handleWelcome } from "./events/welcome.js";
 import { handleReactionAdd, handleReactionRemove } from "./events/reactionRoles.js";
 import { initInviteTracker, handleInviteCreate, handleInviteDelete, handleInviteJoin } from "./events/inviteTracker.js";
@@ -357,6 +358,7 @@ export function startBot(): void {
     // ── Normal guild message processing ─────────────────────────────────────
     await handleAutoMod(message);
     await handleHarassmentDetection(message);
+    await handleXp(message);
   });
 
   client.on(Events.MessageDelete, async (message) => {
