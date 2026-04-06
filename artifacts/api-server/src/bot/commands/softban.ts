@@ -43,64 +43,67 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   await interaction.deferReply();
 
+  // ── Critical: ban + immediate unban ──────────────────────────────────────
   try {
     await interaction.guild.members.ban(target, {
       reason: `[Softban] ${reason} — by ${interaction.user.tag}`,
       deleteMessageSeconds: deleteDays * 86_400,
     });
     await interaction.guild.members.unban(target, `Softban unban — by ${interaction.user.tag}`);
-
-    const embed = new EmbedBuilder()
-      .setColor(THEME.warning)
-      .setAuthor({ name: `🔨  Member Softbanned  ·  ${BOT_NAME}` })
-      .setTitle(target.tag)
-      .setURL(`https://discord.com/users/${target.id}`)
-      .setThumbnail(target.displayAvatarURL())
-      .addFields(
-        { name: "Member",    value: `${target}`, inline: true },
-        { name: "Moderator", value: `${interaction.user}`, inline: true },
-        { name: "Messages Deleted", value: `${deleteDays} day(s)`, inline: true },
-        { name: "Reason",    value: reason },
-      )
-      .setFooter({ text: `ID: ${target.id} · Softban — member may rejoin` })
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [embed] });
-    log.ban(target.tag, interaction.guild.name, `[softban] ${reason}`);
-
-    await sendModLog(interaction.guild, {
-      action: "🔨  Member Softbanned",
-      color: THEME.warning,
-      target,
-      moderator: interaction.user,
-      reason,
-      extra: { "Messages Deleted": `${deleteDays} day(s)` },
-      adminOnly: true,
-    });
-
-    await logCase(
-      interaction.guild.id,
-      "softban",
-      target.id,
-      target.tag,
-      interaction.user.id,
-      interaction.user.tag,
-      reason,
-    );
-
-    // DM the user
-    await target.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(THEME.warning)
-          .setAuthor({ name: `🔨  ${BOT_NAME}  ·  Softban Notice` })
-          .setTitle(interaction.guild.name)
-          .setDescription(`You have been softbanned from **${interaction.guild.name}**.\n\nYour recent messages have been cleared. You may rejoin with a fresh invite if you wish to return.`)
-          .addFields({ name: "Reason", value: reason })
-          .setTimestamp(),
-      ],
-    }).catch(() => {});
   } catch (err) {
     await interaction.editReply({ content: `Failed to softban member: ${String(err)}` });
+    return;
   }
+
+  // ── Success reply — nothing below can overwrite this ─────────────────────
+  const embed = new EmbedBuilder()
+    .setColor(THEME.warning)
+    .setAuthor({ name: `🔨  Member Softbanned  ·  ${BOT_NAME}` })
+    .setTitle(target.tag)
+    .setURL(`https://discord.com/users/${target.id}`)
+    .setThumbnail(target.displayAvatarURL())
+    .addFields(
+      { name: "Member",    value: `${target}`, inline: true },
+      { name: "Moderator", value: `${interaction.user}`, inline: true },
+      { name: "Messages Deleted", value: `${deleteDays} day(s)`, inline: true },
+      { name: "Reason",    value: reason },
+    )
+    .setFooter({ text: `ID: ${target.id} · Softban — member may rejoin` })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+  log.ban(target.tag, interaction.guild.name, `[softban] ${reason}`);
+
+  // ── Side-effects — individually suppressed so they can't affect the reply ─
+  await sendModLog(interaction.guild, {
+    action: "🔨  Member Softbanned",
+    color: THEME.warning,
+    target,
+    moderator: interaction.user,
+    reason,
+    extra: { "Messages Deleted": `${deleteDays} day(s)` },
+    adminOnly: true,
+  }).catch(() => {});
+
+  await logCase(
+    interaction.guild.id,
+    "softban",
+    target.id,
+    target.tag,
+    interaction.user.id,
+    interaction.user.tag,
+    reason,
+  ).catch(() => {});
+
+  await target.send({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(THEME.warning)
+        .setAuthor({ name: `🔨  ${BOT_NAME}  ·  Softban Notice` })
+        .setTitle(interaction.guild.name)
+        .setDescription(`You have been softbanned from **${interaction.guild.name}**.\n\nYour recent messages have been cleared. You may rejoin with a fresh invite if you wish to return.`)
+        .addFields({ name: "Reason", value: reason })
+        .setTimestamp(),
+    ],
+  }).catch(() => {});
 }
