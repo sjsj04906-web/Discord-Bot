@@ -1,4 +1,4 @@
-import { Events, type Interaction, type GuildMember, PermissionFlagsBits, EmbedBuilder, MessageFlags } from "discord.js";
+import { Events, type Interaction, type GuildMember, PermissionFlagsBits, EmbedBuilder, MessageFlags, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from "discord.js";
 import { client, commands } from "./client.js";
 import { allCommands } from "./commands/index.js";
 import { handleAutoMod } from "./automod.js";
@@ -11,6 +11,8 @@ import { handleMemberUpdate } from "./events/memberUpdate.js";
 import { handleAntiGhostping } from "./events/antiGhostping.js";
 import { handleDirectMessage, handleModMailReply, handleModMailButtonInteraction } from "./events/modmail.js";
 import { handleVoiceStateUpdate } from "./events/voiceLog.js";
+import { handleMemberJoinLog, handleMemberLeaveLog } from "./events/joinLeaveLog.js";
+import { startReminderScheduler } from "./reminderScheduler.js";
 import { handleWelcome } from "./events/welcome.js";
 import { handleReactionAdd, handleReactionRemove } from "./events/reactionRoles.js";
 import { initInviteTracker, handleInviteCreate, handleInviteDelete, handleInviteJoin } from "./events/inviteTracker.js";
@@ -59,6 +61,7 @@ export function startBot(): void {
     startWarnExpiryScheduler();
     startRetentionScheduler();
     startServerStatsScheduler(readyClient);
+    startReminderScheduler(readyClient);
     await initInviteTracker(readyClient);
   });
 
@@ -187,6 +190,65 @@ export function startBot(): void {
           ],
         }).catch(() => {});
       }
+      return;
+    }
+
+    // ── Ban appeal — button (show modal) ─────────────────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith("ban_appeal_")) {
+      const guildId = interaction.customId.replace("ban_appeal_", "");
+      const modal = new ModalBuilder()
+        .setCustomId(`ban_appeal_modal_${guildId}`)
+        .setTitle("Ban Appeal");
+      const textInput = new TextInputBuilder()
+        .setCustomId("ban_appeal_text")
+        .setLabel("Explain why this ban should be reversed")
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder("Be clear and honest. Staff review all appeals.")
+        .setMinLength(20)
+        .setMaxLength(1000)
+        .setRequired(true);
+      modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(textInput));
+      await interaction.showModal(modal);
+      return;
+    }
+
+    // ── Ban appeal — modal submit ─────────────────────────────────────────────
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("ban_appeal_modal_")) {
+      const guildId  = interaction.customId.replace("ban_appeal_modal_", "");
+      const text     = interaction.fields.getTextInputValue("ban_appeal_text");
+      const userId   = interaction.user.id;
+      const userTag  = interaction.user.tag;
+
+      await interaction.reply({ content: "✅ Your appeal has been submitted. Staff will review it.", flags: MessageFlags.Ephemeral });
+
+      // Find the guild and post to admin/mod log
+      const targetGuild = interaction.client.guilds.cache.get(guildId);
+      if (!targetGuild) return;
+
+      const config = await import("./db.js").then((m) => m.getGuildConfig(guildId)).catch(() => null);
+      const logChannelId = config?.adminLogChannelId || config?.modLogChannelId || "";
+      const FALLBACK = ["admin-log", "adminlog", "mod-log", "modlog"];
+      const logCh = (logChannelId && targetGuild.channels.cache.get(logChannelId)?.isTextBased()
+        ? targetGuild.channels.cache.get(logChannelId)
+        : targetGuild.channels.cache.find(
+            (c) => FALLBACK.some((n) => c.name.toLowerCase().includes(n)) && c.isTextBased()
+          )) as import("discord.js").TextChannel | undefined;
+
+      if (!logCh) return;
+
+      const appealEmbed = new EmbedBuilder()
+        .setColor(THEME.warn)
+        .setAuthor({ name: `📝  Ban Appeal Received  ·  ${BOT_NAME}` })
+        .setThumbnail(interaction.user.displayAvatarURL())
+        .addFields(
+          { name: "User",    value: `${userTag} \`${userId}\``, inline: true },
+          { name: "Server",  value: targetGuild.name, inline: true },
+          { name: "Appeal",  value: text.slice(0, 1024) },
+        )
+        .setFooter({ text: `User ID: ${userId}` })
+        .setTimestamp();
+
+      await logCh.send({ embeds: [appealEmbed] }).catch(() => {});
       return;
     }
 
@@ -319,10 +381,12 @@ export function startBot(): void {
     await handleWelcome(member);
     await handleRoleRestore(member);
     await handleInviteJoin(member as GuildMember);
+    await handleMemberJoinLog(member as GuildMember);
   });
 
   client.on(Events.GuildMemberRemove, async (member) => {
     log.leave(member.user.tag, member.guild.name);
+    await handleMemberLeaveLog(member);
     if (member.partial) return;
     await handleMemberLeave(member);
   });

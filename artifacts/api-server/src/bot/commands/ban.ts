@@ -2,6 +2,9 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { log } from "../display.js";
@@ -81,6 +84,30 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     await interaction.reply({ embeds: [embed] });
     log.ban(target.tag, interaction.guild.name, reason);
+
+    // DM the banned user with an appeal button
+    const appealRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`ban_appeal_${interaction.guild.id}`)
+        .setLabel("Appeal this ban")
+        .setEmoji("📝")
+        .setStyle(ButtonStyle.Secondary)
+    );
+    await target.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(THEME.ban)
+          .setAuthor({ name: `⛔  You were banned from ${interaction.guild.name}  ·  ${BOT_NAME}` })
+          .addFields(
+            { name: "Reason",    value: reason },
+            { name: "Moderator", value: interaction.user.tag },
+          )
+          .setDescription("If you believe this ban was issued in error, you may submit an appeal using the button below. Your appeal will be sent to the server's staff for review.")
+          .setFooter({ text: `${BOT_NAME}  ·  Server ID: ${interaction.guild.id}` })
+          .setTimestamp(),
+      ],
+      components: [appealRow],
+    }).catch(() => {});
 
     await sendModLog(interaction.guild, {
       action: "⛔  Member Banned",

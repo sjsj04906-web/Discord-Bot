@@ -47,6 +47,8 @@ import * as afk from "./afk.js";
 import * as verify from "./verify.js";
 import * as serverstats from "./serverstats.js";
 import * as mydata from "./mydata.js";
+import * as modstats from "./modstats.js";
+import * as remind from "./remind.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -65,4 +67,6 @@ export const allCommands: SlashCommand[] = [
   autorole, modmailcmd, messagelog, adminlog, modlog,
   snipe, afk, verify, serverstats, rules,
   mydata,
+  modstats,
+  remind,
 ];

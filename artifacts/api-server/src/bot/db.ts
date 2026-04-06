@@ -1,5 +1,5 @@
-import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable, roleBackupsTable, modMailSessionsTable } from "@workspace/db";
-import { eq, and, desc, count, sql, inArray, lt, gt } from "drizzle-orm";
+import { db, warningsTable, notesTable, tempBansTable, guildConfigTable, wordFilterTable, commandPermsTable, casesTable, ticketsTable, tempRolesTable, reactionRolesTable, roleBackupsTable, modMailSessionsTable, remindersTable } from "@workspace/db";
+import { eq, and, desc, count, sql, inArray, lt, gt, lte } from "drizzle-orm";
 import type { GuildConfig } from "@workspace/db";
 
 // ─── Warnings ─────────────────────────────────────────────────────────────────
@@ -496,6 +496,61 @@ export async function purgeOldRecords(guildId: string, days: number): Promise<nu
   }
 
   return total;
+}
+
+// ─── Mod Stats ────────────────────────────────────────────────────────────────
+export async function getModStats(guildId: string) {
+  const rows = await db
+    .select({
+      moderatorId:  casesTable.moderatorId,
+      moderatorTag: casesTable.moderatorTag,
+      total:        count(casesTable.id),
+      bans:         sql<number>`COUNT(*) FILTER (WHERE ${casesTable.actionType} ILIKE '%ban%')`,
+      kicks:        sql<number>`COUNT(*) FILTER (WHERE ${casesTable.actionType} ILIKE '%kick%')`,
+      mutes:        sql<number>`COUNT(*) FILTER (WHERE ${casesTable.actionType} ILIKE '%mute%')`,
+      warns:        sql<number>`COUNT(*) FILTER (WHERE ${casesTable.actionType} ILIKE '%warn%')`,
+    })
+    .from(casesTable)
+    .where(eq(casesTable.guildId, guildId))
+    .groupBy(casesTable.moderatorId, casesTable.moderatorTag)
+    .orderBy(desc(count(casesTable.id)));
+  return rows;
+}
+
+// ─── Reminders ────────────────────────────────────────────────────────────────
+export async function addReminder(r: {
+  userId: string; channelId: string; guildId: string; reminder: string; remindAt: Date;
+}): Promise<number> {
+  const [row] = await db.insert(remindersTable).values(r).returning({ id: remindersTable.id });
+  return row!.id;
+}
+
+export async function getUserReminders(userId: string) {
+  return db
+    .select()
+    .from(remindersTable)
+    .where(and(eq(remindersTable.userId, userId), eq(remindersTable.sent, false)))
+    .orderBy(remindersTable.remindAt);
+}
+
+export async function deleteReminder(id: number, userId: string): Promise<boolean> {
+  const rows = await db.select().from(remindersTable).where(
+    and(eq(remindersTable.id, id), eq(remindersTable.userId, userId))
+  );
+  if (rows.length === 0) return false;
+  await db.delete(remindersTable).where(eq(remindersTable.id, id));
+  return true;
+}
+
+export async function getPendingReminders() {
+  return db
+    .select()
+    .from(remindersTable)
+    .where(and(eq(remindersTable.sent, false), lte(remindersTable.remindAt, new Date())));
+}
+
+export async function markReminderSent(id: number) {
+  await db.update(remindersTable).set({ sent: true }).where(eq(remindersTable.id, id));
 }
 
 // ─── GDPR: all guilds with retention configured ───────────────────────────────

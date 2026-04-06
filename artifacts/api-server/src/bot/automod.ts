@@ -6,6 +6,7 @@ import {
 } from "discord.js";
 import { log } from "./display.js";
 import { addWarning, countWarnings, getGuildConfig, getExemptChannelIds, getWordFilter } from "./db.js";
+import { containsPhishingUrl, containsDangerousAttachment, containsSpoilerAbuse } from "./utils/phishing.js";
 import { sendModLog } from "./modlog.js";
 import { THEME, BOT_NAME } from "./theme.js";
 import { randomAutomodWarnLine } from "./utils/savagelines.js";
@@ -210,6 +211,20 @@ export async function handleAutoMod(message: Message): Promise<void> {
 
   const hit = containsBannedWord(content, bannedWords);
   if (hit) violations.push(`Banned word: "${hit}"`);
+
+  // ── Enhanced URL / attachment / spoiler checks ──────────────────────────────
+  if (containsPhishingUrl(content))
+    violations.push("Phishing / scam URL detected");
+
+  if (containsSpoilerAbuse(content))
+    violations.push("Spoiler tag abuse (word filter bypass attempt)");
+
+  const dangerousFile = containsDangerousAttachment(
+    message.attachments.map((a) => a.name ?? "")
+  );
+  if (dangerousFile)
+    violations.push(`Dangerous attachment: \`${dangerousFile}\``);
+
 
   if (violations.length === 0) return;
 

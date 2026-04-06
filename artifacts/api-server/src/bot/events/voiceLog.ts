@@ -1,71 +1,89 @@
 import { type VoiceState, EmbedBuilder, type TextChannel } from "discord.js";
-import { THEME } from "../theme.js";
+import { getGuildConfig } from "../db.js";
+import { THEME, BOT_NAME } from "../theme.js";
 
-const MOD_LOG_NAMES = ["mod-log", "modlog", "mod-logs", "modlogs"];
+const FALLBACK_NAMES = ["voice-log", "voicelog", "voice-activity", "admin-log", "adminlog"];
 
-function getModLog(state: VoiceState): TextChannel | undefined {
-  return state.guild.channels.cache.find(
-    (c) => MOD_LOG_NAMES.includes(c.name.toLowerCase()) && c.isTextBased()
-  ) as TextChannel | undefined;
+async function getVoiceLogChannel(guild: VoiceState["guild"]): Promise<TextChannel | null> {
+  const config = await getGuildConfig(guild.id).catch(() => null);
+
+  if (config?.voiceLogChannelId) {
+    const ch = guild.channels.cache.get(config.voiceLogChannelId);
+    if (ch?.isTextBased()) return ch as TextChannel;
+  }
+  if (config?.adminLogChannelId) {
+    const ch = guild.channels.cache.get(config.adminLogChannelId);
+    if (ch?.isTextBased()) return ch as TextChannel;
+  }
+
+  return (guild.channels.cache.find(
+    (c) => FALLBACK_NAMES.some((n) => c.name.toLowerCase().includes(n)) && c.isTextBased()
+  ) as TextChannel | undefined) ?? null;
 }
 
 export async function handleVoiceStateUpdate(oldState: VoiceState, newState: VoiceState): Promise<void> {
   const member = newState.member ?? oldState.member;
   if (!member || member.user.bot) return;
 
-  const joined  = !oldState.channelId && newState.channelId;
-  const left    = oldState.channelId && !newState.channelId;
-  const moved   = oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId;
-  const muted   = !oldState.mute && newState.mute;
-  const unmuted = oldState.mute && !newState.mute;
-  const deafed  = !oldState.deaf && newState.deaf;
-  const undeafed = oldState.deaf && !newState.deaf;
+  const guild = newState.guild;
+
+  const joined   = !oldState.channelId && !!newState.channelId;
+  const left     = !!oldState.channelId && !newState.channelId;
+  const moved    = !!oldState.channelId && !!newState.channelId && oldState.channelId !== newState.channelId;
+  const muted    = !oldState.serverMute && !!newState.serverMute;
+  const unmuted  = !!oldState.serverMute && !newState.serverMute;
+  const deafed   = !oldState.serverDeaf && !!newState.serverDeaf;
+  const undeafed = !!oldState.serverDeaf && !newState.serverDeaf;
 
   if (!joined && !left && !moved && !muted && !unmuted && !deafed && !undeafed) return;
 
-  const channel = getModLog(newState.channel ? newState : oldState);
-  if (!channel) return;
+  const logCh = await getVoiceLogChannel(guild);
+  if (!logCh) return;
 
-  let title = "";
-  let color = THEME.info;
-  let description = "";
+  let color   = THEME.info;
+  let title   = "";
+  let details = "";
 
   if (joined) {
-    title = "🔊 VOICE JOIN";
-    color = THEME.success;
-    description = `${member} joined <#${newState.channelId}>`;
+    color   = THEME.success;
+    title   = "🔊  Joined Voice";
+    details = `<#${newState.channelId}>`;
   } else if (left) {
-    title = "🔇 VOICE LEAVE";
-    color = THEME.muted;
-    description = `${member} left <#${oldState.channelId}>`;
+    color   = THEME.danger;
+    title   = "🔇  Left Voice";
+    details = `<#${oldState.channelId}>`;
   } else if (moved) {
-    title = "🔀 VOICE MOVE";
-    color = THEME.info;
-    description = `${member} moved from <#${oldState.channelId}> → <#${newState.channelId}>`;
+    color   = THEME.warn;
+    title   = "↔️  Moved Voice Channel";
+    details = `<#${oldState.channelId}> → <#${newState.channelId}>`;
   } else if (muted) {
-    title = "🔕 SERVER MUTED";
-    color = THEME.warn;
-    description = `${member} was server-muted in <#${newState.channelId}>`;
+    color   = THEME.warn;
+    title   = "🔕  Server Muted";
+    details = `in <#${newState.channelId}>`;
   } else if (unmuted) {
-    title = "🔔 SERVER UNMUTED";
-    color = THEME.success;
-    description = `${member} was server-unmuted in <#${newState.channelId}>`;
+    color   = THEME.success;
+    title   = "🔊  Server Unmuted";
+    details = `in <#${newState.channelId}>`;
   } else if (deafed) {
-    title = "🙉 SERVER DEAFENED";
-    color = THEME.warn;
-    description = `${member} was server-deafened in <#${newState.channelId}>`;
+    color   = THEME.warn;
+    title   = "🔕  Server Deafened";
+    details = `in <#${newState.channelId}>`;
   } else if (undeafed) {
-    title = "👂 SERVER UNDEAFENED";
-    color = THEME.success;
-    description = `${member} was server-undeafened in <#${newState.channelId}>`;
+    color   = THEME.success;
+    title   = "🔔  Server Undeafened";
+    details = `in <#${newState.channelId}>`;
   }
 
   const embed = new EmbedBuilder()
     .setColor(color)
-    .setTitle(`🎙️ // ${title}`)
-    .setDescription(description)
+    .setAuthor({ name: `${title}  ·  ${BOT_NAME}` })
+    .setThumbnail(member.user.displayAvatarURL())
+    .addFields(
+      { name: "Member",  value: `${member} \`${member.user.tag}\``, inline: true },
+      { name: "Channel", value: details, inline: true },
+    )
     .setFooter({ text: `User ID: ${member.user.id}` })
     .setTimestamp();
 
-  await channel.send({ embeds: [embed] }).catch(() => {});
+  await logCh.send({ embeds: [embed] }).catch(() => {});
 }

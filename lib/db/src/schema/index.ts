@@ -10,3 +10,4 @@ export * from "./temproles";
 export * from "./reactionroles";
 export * from "./rolebackups";
 export * from "./modmailsessions";
+export * from "./reminders";

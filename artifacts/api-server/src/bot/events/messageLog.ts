@@ -99,8 +99,8 @@ export async function handleMessageUpdate(
   const logCh = await getLogChannel(newMessage.guild, config.messageLogChannelId);
   if (!logCh) return;
 
-  const before = oldMessage.content.slice(0, 512);
-  const after  = (newMessage.content ?? "").slice(0, 512);
+  const before = oldMessage.content.slice(0, 900);
+  const after  = (newMessage.content ?? "").slice(0, 900);
 
   const embed = new EmbedBuilder()
     .setColor(THEME.info)
@@ -112,10 +112,11 @@ export async function handleMessageUpdate(
         value:  newMessage.author ? `${newMessage.author} \`${newMessage.author.tag}\`` : "Unknown",
         inline: true,
       },
-      { name: "Channel", value: `<#${newMessage.channelId}>`, inline: true },
+      { name: "Channel", value: `<#${newMessage.channelId}>  [Jump ↗](${newMessage.url})`, inline: true },
+      { name: "Before",  value: before.length ? `\`\`\`\n${before}\n\`\`\`` : "*empty*", inline: false },
+      { name: "After",   value: after.length  ? `\`\`\`\n${after}\n\`\`\`` : "*empty*", inline: false },
     )
     .setThumbnail(newMessage.author?.displayAvatarURL() ?? null)
-    .setDescription(`**Before**\n${before}\n\n**After**\n${after}`)
     .setFooter({ text: `Message ID: ${newMessage.id}  ·  User ID: ${newMessage.author?.id ?? "?"}` })
     .setTimestamp();
 
