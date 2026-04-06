@@ -40,6 +40,7 @@ import * as modmailcmd from "./modmailcmd.js";
 import * as messagelog from "./messagelog.js";
 import * as adminlog from "./adminlog.js";
 import * as modlog from "./modlog.js";
+import * as rules from "./rules.js";
 import * as softban from "./softban.js";
 import * as snipe from "./snipe.js";
 import * as afk from "./afk.js";
@@ -61,5 +62,5 @@ export const allCommands: SlashCommand[] = [
   history, report, stats, antiraid,
   caseCmd, welcome, ticket, temprole, reactionrole, exportwarns,
   autorole, modmailcmd, messagelog, adminlog, modlog,
-  snipe, afk, verify, serverstats,
+  snipe, afk, verify, serverstats, rules,
 ];
