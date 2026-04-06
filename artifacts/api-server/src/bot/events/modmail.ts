@@ -27,26 +27,26 @@ async function forwardDmToMod(message: Message, guild: Guild): Promise<void> {
   const modChannel = await guild.channels.fetch(config.modMailChannelId).catch(() => null) as TextChannel | null;
   if (!modChannel) return;
 
-  const user     = message.author;
-  const safeName = user.username.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20) || "user";
-  const chanName = `${MAIL_CHANNEL_PREFIX}${safeName}`;
+  const user = message.author;
 
   // Check for an existing open session in DB
   let existingSession = await getModMailSessionByUser(guild.id, user.id);
 
-  // If a session exists, re-use its channel (even if not in cache)
+  // Re-use an existing open session if one exists
   let mailChannel: TextChannel | null = null;
   if (existingSession) {
     mailChannel = await guild.channels.fetch(existingSession.channelId).catch(() => null) as TextChannel | null;
-    // If the channel was manually deleted, clear the stale session
     if (!mailChannel) {
       await closeModMailSession(existingSession.id);
       existingSession = null;
     }
   }
 
-  // No open session — create a new mail channel
+  // No open session — create an anonymous mail channel
   if (!mailChannel) {
+    // Random 6-char case ID — reveals nothing about the sender
+    const caseId  = Math.random().toString(36).slice(2, 8);
+    const chanName = `${MAIL_CHANNEL_PREFIX}${caseId}`;
     const category = modChannel.parentId;
 
     const modRoles = guild.roles.cache.filter((r) =>
@@ -69,16 +69,10 @@ async function forwardDmToMod(message: Message, guild: Guild): Promise<void> {
     for (const role of modRoles.values()) {
       permissionOverwrites.push({
         id: role.id,
-        allow: [
-          PermissionFlagsBits.ViewChannel,
-          PermissionFlagsBits.SendMessages,
-          PermissionFlagsBits.ReadMessageHistory,
-        ],
+        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory],
       });
     }
 
-    // If no mod roles matched, also allow the channel owner (administrator)
-    // so at least someone can see it
     if (modRoles.size === 0) {
       const adminRoles = guild.roles.cache.filter((r) => r.permissions.has(PermissionFlagsBits.Administrator));
       for (const role of adminRoles.values()) {
@@ -94,44 +88,38 @@ async function forwardDmToMod(message: Message, guild: Guild): Promise<void> {
       type: ChannelType.GuildText,
       parent: category ?? undefined,
       permissionOverwrites,
-      topic: `Mod mail thread · ${user.tag} (${user.id})`,
+      topic: `Anonymous mod mail thread — case ${caseId.toUpperCase()}`,
     }) as TextChannel;
 
     await openModMailSession(guild.id, user.id, user.tag, mailChannel.id);
 
-    // Opening embed in the new mail channel
+    // Opening embed — no user identity shown to mods
     const openEmbed = new EmbedBuilder()
       .setColor(THEME.info)
       .setAuthor({ name: `📬  Mod Mail Opened  ·  ${BOT_NAME}` })
-      .setTitle(user.tag)
-      .setURL(`https://discord.com/users/${user.id}`)
-      .setThumbnail(user.displayAvatarURL())
-      .addFields(
-        { name: "User ID",      value: `\`${user.id}\``, inline: true },
-        { name: "Account Age",  value: `<t:${Math.floor(user.createdTimestamp / 1000)}:R>`, inline: true },
-      )
-      .setDescription("Reply in this channel — every message you send will be forwarded to the user's DMs.\nUse `/modmail close` to resolve and delete this thread.")
+      .setTitle(`Anonymous Thread — Case ${caseId.toUpperCase()}`)
+      .setDescription("An anonymous member has opened a mod mail thread.\n\nReply by typing in this channel — every message is forwarded to them.\nUse `/modmail close` to resolve and archive this thread.")
       .setTimestamp();
 
     await mailChannel.send({ embeds: [openEmbed] });
 
-    // Acknowledge to the user
+    // Acknowledge to the user (no mod identity, no guild branding beyond name)
     await user.send({
       embeds: [
         new EmbedBuilder()
           .setColor(THEME.info)
           .setAuthor({ name: `📬  Mod Mail  ·  ${BOT_NAME}` })
           .setTitle(`Message received — ${guild.name}`)
-          .setDescription("Your message has been received by the moderation team. They will reply here shortly.\n\nYou can continue sending messages and they will all be forwarded.")
+          .setDescription("Your message has been received anonymously by the moderation team. They will reply here shortly.\n\nYou can keep sending messages and they will all be forwarded.")
           .setTimestamp(),
       ],
     }).catch(() => {});
   }
 
-  // Forward the message to the mail channel
+  // Forward the message — no username or avatar shown
   const fwdEmbed = new EmbedBuilder()
     .setColor(0x5865f2)
-    .setAuthor({ name: user.tag, iconURL: user.displayAvatarURL() })
+    .setAuthor({ name: "Anonymous User" })
     .setDescription(message.content || "_[no text content]_")
     .setTimestamp();
 
