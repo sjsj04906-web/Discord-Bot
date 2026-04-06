@@ -16,6 +16,7 @@ import {
   getOrCreateXp,
 } from "../db.js";
 import { levelFromXp } from "../utils/xpMath.js";
+import { syncMemberLevelRole } from "../utils/roleSync.js";
 
 // ── Cyberpunk-themed default level roles ─────────────────────────────────────
 const DEFAULT_LEVEL_ROLES: Array<{ level: number; name: string; color: number }> = [
@@ -254,8 +255,16 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const amount = interaction.options.getInteger("amount", true);
     await setUserXp(interaction.guild.id, target.id, amount);
     const newLevel = levelFromXp(amount);
+
+    // Sync the member's level role to match their new XP
+    const grantedRole = await syncMemberLevelRole(interaction.guild, target.id, amount).catch(() => null);
+
+    const desc = grantedRole
+      ? `✅ Set ${target}'s XP to **${amount.toLocaleString()}** (Level **${newLevel}**) and granted the **${grantedRole}** role.`
+      : `✅ Set ${target}'s XP to **${amount.toLocaleString()}** (Level **${newLevel}**).`;
+
     await interaction.reply({
-      embeds: [new EmbedBuilder().setColor(THEME.success).setDescription(`✅ Set ${target}'s XP to **${amount.toLocaleString()}** (Level **${newLevel}**).`)],
+      embeds: [new EmbedBuilder().setColor(THEME.success).setDescription(desc)],
       ephemeral: true,
     });
     return;
@@ -265,8 +274,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   if (sub === "resetxp") {
     const target = interaction.options.getUser("user", true);
     await resetUserXp(interaction.guild.id, target.id);
+
+    // Strip all level roles from the member
+    await syncMemberLevelRole(interaction.guild, target.id, 0).catch(() => null);
+
     await interaction.reply({
-      embeds: [new EmbedBuilder().setColor(THEME.warn).setDescription(`✅ Reset ${target}'s XP and level to zero.`)],
+      embeds: [new EmbedBuilder().setColor(THEME.warn).setDescription(`✅ Reset ${target}'s XP and level to zero and removed their level role.`)],
       ephemeral: true,
     });
     return;
