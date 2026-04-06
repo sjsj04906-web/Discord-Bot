@@ -2,8 +2,6 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  PermissionOverwrites,
-  OverwriteType,
   type ChatInputCommandInteraction,
   type TextChannel,
   type Role,
@@ -15,8 +13,6 @@ import { addReactionRole } from "../db.js";
 import { BOT_NAME } from "../theme.js";
 
 const GATE_EMOJI = "✅";
-
-// Channels where @everyone keeps read access regardless
 const EXEMPT_NAMES = ["rules", "welcome", "verify", "start-here", "read-me", "readme"];
 
 // ── Rules list ────────────────────────────────────────────────────────────────
@@ -84,24 +80,17 @@ function buildRulesEmbed(guildName: string, guildIcon: string | null, withGate: 
 // ── Command ───────────────────────────────────────────────────────────────────
 export const data = new SlashCommandBuilder()
   .setName("rules")
-  .setDescription("Display or configure the server rules")
-  .addSubcommand((sub) =>
-    sub.setName("post")
-      .setDescription("Post the rules embed in this channel")
-      .addRoleOption((o) =>
-        o.setName("gate_role")
-          .setDescription("Role granted when a member reacts ✅ — gates access to other channels")
-          .setRequired(false)
-      )
-      .addBooleanOption((o) =>
-        o.setName("lock_channels")
-          .setDescription("Automatically restrict all non-exempt channels to require the gate role (default: false)")
-          .setRequired(false)
-      )
+  .setDescription("Post the server rules")
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+  .addRoleOption((o) =>
+    o.setName("gate_role")
+      .setDescription("Role granted when a member reacts ✅ — gates access to other channels")
+      .setRequired(false)
   )
-  .addSubcommand((sub) =>
-    sub.setName("dm")
-      .setDescription("Send the rules to your DMs")
+  .addBooleanOption((o) =>
+    o.setName("lock_channels")
+      .setDescription("Automatically restrict all non-exempt channels to require the gate role (default: false)")
+      .setRequired(false)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -110,50 +99,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  const sub = interaction.options.getSubcommand();
-
-  // ── /rules dm ────────────────────────────────────────────────────────────────
-  if (sub === "dm") {
-    const embed = buildRulesEmbed(interaction.guild.name, interaction.guild.iconURL(), false);
-    const sent  = await interaction.user.send({ embeds: [embed] }).catch(() => null);
-    if (!sent) {
-      await interaction.reply({
-        content: "❌ I couldn't send you a DM — make sure your DMs are open.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-    await interaction.reply({ content: "📬 Rules sent to your DMs!", flags: MessageFlags.Ephemeral });
-    return;
-  }
-
-  // ── /rules post ──────────────────────────────────────────────────────────────
-  const member = interaction.guild.members.cache.get(interaction.user.id);
-  const isStaff = interaction.guild.ownerId === interaction.user.id
-    || (member?.permissions.has(PermissionFlagsBits.ManageGuild) ?? false);
-
-  if (!isStaff) {
-    await interaction.reply({
-      content: "You need the **Manage Server** permission to post the rules.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
-  const gateRole    = interaction.options.getRole("gate_role") as Role | null;
+  const gateRole     = interaction.options.getRole("gate_role") as Role | null;
   const lockChannels = interaction.options.getBoolean("lock_channels") ?? false;
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const rulesChannel = interaction.channel as TextChannel;
-  const embed = buildRulesEmbed(interaction.guild.name, interaction.guild.iconURL(), !!gateRole);
-  const rulesMsg = await rulesChannel.send({ embeds: [embed] });
+  const embed        = buildRulesEmbed(interaction.guild.name, interaction.guild.iconURL(), !!gateRole);
+  const rulesMsg     = await rulesChannel.send({ embeds: [embed] });
 
-  // Add ✅ reaction if using the gate
   if (gateRole) {
     await rulesMsg.react(GATE_EMOJI).catch(() => {});
-
-    // Register in the reaction roles table — existing handleReactionAdd picks it up automatically
     await addReactionRole(
       interaction.guild.id,
       rulesMsg.id,
@@ -164,20 +120,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     ).catch(() => {});
   }
 
-  // Optional: lock all non-exempt channels
   const lockedChannels: string[] = [];
   const skippedChannels: string[] = [];
 
   if (gateRole && lockChannels) {
     const everyone = interaction.guild.roles.everyone;
-
-    const textChannels = interaction.guild.channels.cache.filter(
-      (ch): ch is GuildChannel =>
-        (ch.type === ChannelType.GuildText || ch.type === ChannelType.GuildAnnouncement) &&
-        !ch.parentId // skip channels in categories for now, handle below
-          ? true
-          : (ch.type === ChannelType.GuildText || ch.type === ChannelType.GuildAnnouncement),
-    );
 
     for (const ch of interaction.guild.channels.cache.values()) {
       if (ch.type !== ChannelType.GuildText && ch.type !== ChannelType.GuildAnnouncement) continue;
@@ -188,11 +135,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         EXEMPT_NAMES.some((n) => tc.name.toLowerCase().includes(n));
 
       if (isExempt) {
-        // Exempt: make sure @everyone can view
         await tc.permissionOverwrites.edit(everyone, { ViewChannel: true }).catch(() => {});
         skippedChannels.push(`<#${tc.id}>`);
       } else {
-        // Locked: deny @everyone, allow gate role
         await tc.permissionOverwrites.edit(everyone, { ViewChannel: false }).catch(() => {});
         await tc.permissionOverwrites.edit(gateRole,  { ViewChannel: true  }).catch(() => {});
         lockedChannels.push(`<#${tc.id}>`);
@@ -200,18 +145,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     }
   }
 
-  // ── Summary reply ─────────────────────────────────────────────────────────
   const lines: string[] = ["✅ Rules posted."];
-
-  if (gateRole) {
-    lines.push(`\n**Gate role:** ${gateRole} — members get it by reacting ${GATE_EMOJI} to the rules message.`);
-  }
-
+  if (gateRole) lines.push(`\n**Gate role:** ${gateRole} — members get it by reacting ${GATE_EMOJI}.`);
   if (lockChannels && gateRole) {
-    if (lockedChannels.length > 0)
-      lines.push(`\n**Locked** (require ${gateRole.name}):\n${lockedChannels.join(", ")}`);
-    if (skippedChannels.length > 0)
-      lines.push(`\n**Left open** (exempt):\n${skippedChannels.join(", ")}`);
+    if (lockedChannels.length)  lines.push(`\n**Locked:** ${lockedChannels.join(", ")}`);
+    if (skippedChannels.length) lines.push(`\n**Left open:** ${skippedChannels.join(", ")}`);
   } else if (lockChannels && !gateRole) {
     lines.push("\n⚠️ No gate role provided — channel locking skipped.");
   }
