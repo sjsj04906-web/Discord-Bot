@@ -398,6 +398,29 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       );
     });
 
+    // ── DAVE transition-0 fix ────────────────────────────────────────────────────
+    // @discordjs/voice skips DaveTransitionReady (op 23) for the initial
+    // transition id=0, but Discord won't forward Speaking events to channel
+    // members until it receives this ack.  Send it manually once "transitioned"
+    // fires for id 0.
+    connection.on("transitioned", (transitionId: number) => {
+      logger.info({ transitionId }, "TTS voice connection transitioned");
+      if (transitionId === 0) {
+        try {
+          const net = (connection as any).state?.networking;
+          const ws  = net?.state?.ws;
+          if (ws && typeof ws.sendPacket === "function") {
+            ws.sendPacket({ op: 23, d: { transition_id: 0 } });
+            logger.info("TTS: sent DaveTransitionReady(0) — missing from @discordjs/voice");
+          } else {
+            logger.warn("TTS: ws.sendPacket unavailable, skipping DaveTransitionReady(0)");
+          }
+        } catch (e) {
+          logger.warn({ err: (e as Error).message }, "TTS: DaveTransitionReady(0) patch error");
+        }
+      }
+    });
+
     const player = createAudioPlayer();
     connection.subscribe(player);
 
