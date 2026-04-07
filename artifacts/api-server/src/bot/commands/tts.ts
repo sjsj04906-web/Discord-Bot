@@ -16,10 +16,51 @@ import {
   getVoiceConnection,
   AudioPlayer,
   VoiceConnection,
+  VoiceUDPSocket,
 } from "@discordjs/voice";
 import { Readable } from "node:stream";
 import { THEME } from "../theme.js";
 import { logger } from "../../lib/logger.js";
+
+// ── Replit NAT workaround ──────────────────────────────────────────────────────
+// Replit's network forwards outbound UDP but swallows inbound UDP replies, so
+// the standard Discord voice IP-discovery echo never completes.
+// We replace performIPDiscovery with an HTTP-based version: it binds the socket
+// (giving us a real local port for sending RTP later), then fetches the
+// container's public IP via ipify instead of waiting for the unreachable echo.
+// For TTS the bot only needs to SEND audio, so this is sufficient.
+(VoiceUDPSocket.prototype as unknown as {
+  performIPDiscovery(ssrc: number): Promise<{ ip: string; port: number }>;
+}).performIPDiscovery = async function (
+  _ssrc: number
+): Promise<{ ip: string; port: number }> {
+  // Bind the dgram socket so we own a real ephemeral port.
+  let localPort = 0;
+  try {
+    localPort = (this.socket as import("node:dgram").Socket).address().port;
+  } catch {
+    await new Promise<void>((res, rej) => {
+      const sock = this.socket as import("node:dgram").Socket;
+      sock.bind(0, res);
+      sock.once("error", (e: NodeJS.ErrnoException) => {
+        if (e.code === "ERR_SOCKET_ALREADY_BOUND") res();
+        else rej(e);
+      });
+    });
+    localPort = (this.socket as import("node:dgram").Socket).address().port;
+  }
+
+  // Resolve public IP over HTTPS instead of the blocked UDP echo.
+  const resp = await fetch("https://api.ipify.org?format=json", {
+    signal: AbortSignal.timeout(8_000),
+  });
+  const { ip } = (await resp.json()) as { ip: string };
+  logger.info(
+    { ip, port: localPort },
+    "TTS: IP discovery via HTTP (UDP echo blocked on Replit)"
+  );
+  return { ip, port: localPort };
+};
 
 // ── Session store ──────────────────────────────────────────────────────────────
 
