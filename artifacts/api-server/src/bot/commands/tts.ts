@@ -259,16 +259,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       guildId: interaction.guild.id,
       adapterCreator: interaction.guild.voiceAdapterCreator,
       selfDeaf: true,
-      debug: true,
     });
 
-    connection.on("debug", (msg) =>
-      logger.info({ voiceDebug: msg }, "voice internal")
-    );
-
-    // Wait for Ready; log every state transition so we can diagnose hangs
+    // Wait up to 15 s for Ready state
     await new Promise<void>((resolve, reject) => {
-      let lastState = connection.state.status;
+      let lastStatus = connection.state.status;
       let settled = false;
 
       const settle = (err?: Error) => {
@@ -280,35 +275,22 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       };
 
       const onState = (_: unknown, next: { status: VoiceConnectionStatus }) => {
-        logger.info(
-          { from: lastState, to: next.status },
-          "TTS voice connection state change"
-        );
-        lastState = next.status;
-
-        if (next.status === VoiceConnectionStatus.Ready) {
-          settle();
-        } else if (next.status === VoiceConnectionStatus.Destroyed) {
-          settle(new Error(`Connection destroyed while in ${lastState}`));
-        }
+        lastStatus = next.status;
+        if (next.status === VoiceConnectionStatus.Ready) settle();
+        else if (next.status === VoiceConnectionStatus.Destroyed)
+          settle(new Error("Voice connection was destroyed before it became ready."));
       };
 
-      // Already ready (edge-case)
       if (connection.state.status === VoiceConnectionStatus.Ready) {
         settle();
         return;
       }
 
       connection.on("stateChange", onState);
-
-      const timer = setTimeout(() => {
-        settle(
-          new Error(
-            `Timed out waiting for voice (stuck at: ${lastState}). ` +
-            `Check bot permissions and that UDP is reachable.`
-          )
-        );
-      }, 20_000);
+      const timer = setTimeout(
+        () => settle(new Error("Timed out connecting to the voice channel.")),
+        15_000
+      );
     });
 
     const player = createAudioPlayer();
