@@ -580,19 +580,18 @@ export function buildTickerEmbed(
   const RD = "\x1b[31m";  // red    (loss)
   const Y  = "\x1b[33m";  // yellow (halt)
 
-  const header  = `${D}  ${"TICK".padEnd(4)}  ${"PRICE".padStart(7)}  ${"CHG".padEnd(9)}  ${"VOL".padStart(5)}   CORP${R}`;
-  const divider = `${D}  ──────────────────────────────────────────${R}`;
+  const header  = `${D}  ${"TICK".padEnd(4)}  ${"PRICE".padStart(7)}  ${"CHG".padEnd(9)}  ${"VOL".padStart(6)}${R}`;
+  const divider = `${D}  ──────────────────────────────────────${R}`;
 
   const rows = orderedCorps.map((s) => {
-    const meta    = getCorpMeta(s.ticker);
     const halted  = isHalted(s.haltedUntil);
     const tick    = s.ticker.padEnd(4);
     const price   = s.price.toLocaleString("en-US").padStart(7);
-    const vol     = s.volume24h.toLocaleString("en-US").padStart(5);
+    const vol     = s.volume24h.toLocaleString("en-US").padStart(6);
 
     let chg: string;
     if (halted) {
-      chg = `${Y}  HALT    ${R}`;
+      chg = `${Y}${"HALT".padEnd(9)}${R}`;
     } else {
       const p     = pctStr(s.price, s.prevPrice);
       const up    = s.price > s.prevPrice;
@@ -602,8 +601,7 @@ export function buildTickerEmbed(
       chg = up ? `${G}${plain}${R}` : dn ? `${RD}${plain}${R}` : `${D}${plain}${R}`;
     }
 
-    const name = meta.name.length > 13 ? meta.name.slice(0, 12) + "…" : meta.name.padEnd(13);
-    return `  ${B}${tick}${R}  ${price}  ${chg}  ${vol}   ${name}`;
+    return `  ${B}${tick}${R}  ${price}  ${chg}  ${vol}`;
   });
 
   const table = "```ansi\n" + [header, divider, ...rows].join("\n") + "\n```";
