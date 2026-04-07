@@ -111,7 +111,8 @@ function playNext(session: TtsSession): void {
   logger.info({ text }, "TTS playNext: spawning espeak-ng");
 
   try {
-    const proc = spawn("espeak-ng", [
+    // espeak-ng → ffmpeg (OGG Opus) → @discordjs/voice OggOpus path
+    const espeak = spawn("espeak-ng", [
       "-v", session.voice,
       "-s", "155",
       "-a", "180",
@@ -119,25 +120,45 @@ function playNext(session: TtsSession): void {
       text,
     ]);
 
-    proc.stderr.on("data", (d: Buffer) =>
+    const ffmpeg = spawn("ffmpeg", [
+      "-loglevel", "error",
+      "-f", "wav", "-i", "pipe:0",
+      "-c:a", "libopus",
+      "-ar", "48000", "-ac", "2",
+      "-b:a", "96k",
+      "-frame_duration", "20",
+      "-f", "ogg",
+      "pipe:1",
+    ]);
+
+    espeak.stdout.pipe(ffmpeg.stdin);
+
+    espeak.stderr.on("data", (d: Buffer) =>
       logger.warn({ stderr: d.toString().trim() }, "TTS espeak-ng stderr")
     );
-    proc.on("error", (err) => {
+    espeak.on("error", (err) => {
       logger.warn({ err }, "TTS espeak-ng spawn error");
       playNext(session);
     });
-    proc.on("exit", (code) =>
-      logger.info({ code }, "TTS espeak-ng exited")
+    ffmpeg.stderr.on("data", (d: Buffer) =>
+      logger.warn({ stderr: d.toString().trim() }, "TTS ffmpeg stderr")
+    );
+    ffmpeg.on("error", (err) => {
+      logger.warn({ err }, "TTS ffmpeg spawn error");
+      playNext(session);
+    });
+    ffmpeg.on("exit", (code) =>
+      logger.info({ code }, "TTS ffmpeg exited")
     );
 
-    if (!proc.stdout) {
-      logger.warn("TTS espeak-ng: stdout unavailable");
+    if (!ffmpeg.stdout) {
+      logger.warn("TTS ffmpeg: stdout unavailable");
       playNext(session);
       return;
     }
 
-    const resource = createAudioResource(proc.stdout, {
-      inputType: StreamType.Arbitrary,
+    const resource = createAudioResource(ffmpeg.stdout, {
+      inputType: StreamType.OggOpus,
     });
 
     resource.playStream.on("error", (err) =>
