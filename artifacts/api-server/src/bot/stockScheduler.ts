@@ -610,6 +610,7 @@ export function buildTickerEmbed(
     `**${idxArrow} GLITCH Index** — ${idx.toLocaleString("en-US")}  \`${idxPct}\``,
     `${sentiment}  ·  Next price tick <t:${Math.floor(nextTickMs / 1000)}:R>`,
     table,
+    `-# 💡 Use \`/stocks view [TICKER]\` for full corp details`,
   ].join("\n");
 
   return new EmbedBuilder()
