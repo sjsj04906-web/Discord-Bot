@@ -275,9 +275,18 @@ async function runOrderMatcher(client: Client) {
       await processBondMaturities(client, guildId);
       await processTakeovers(client, guildId);
       await processIpoTransitions(client, guildId);
+      // Refresh ticker after order fills may have moved prices
+      await updateLiveTicker(client, guildId);
     } catch (err) {
       logger.error({ err, guildId }, "Order matcher error");
     }
+  }
+}
+
+async function runTickerRefresh(client: Client) {
+  const guilds = client.guilds.cache.map((g) => g.id);
+  for (const guildId of guilds) {
+    await updateLiveTicker(client, guildId).catch(() => {});
   }
 }
 
@@ -634,11 +643,15 @@ export function startStockScheduler(client: Client): void {
   const TICK_MS         = 2 * 60 * 60_000;  // 2 hours
   const ORDER_MATCH_MS  = 10 * 60_000;       // 10 minutes
   const SENTIMENT_MS    = 5 * 60_000;        // 5 minutes
+  const TICKER_MS       = 5 * 60_000;        // 5 minutes
 
   // Flush sentiment buffer every 5 minutes
   setInterval(() => flushSentiment().catch(() => {}), SENTIMENT_MS);
 
-  // Order matching every 10 minutes
+  // Live ticker refresh every 5 minutes (countdown + order-fill price changes)
+  setInterval(() => runTickerRefresh(client).catch(() => {}), TICKER_MS);
+
+  // Order matching every 10 minutes (also refreshes ticker after fills)
   setInterval(() => runOrderMatcher(client).catch((err) => logger.error({ err }, "Order matcher failed")), ORDER_MATCH_MS);
   runOrderMatcher(client).catch(() => {});
 
@@ -647,5 +660,5 @@ export function startStockScheduler(client: Client): void {
   // Delay first tick by 60 seconds so the bot is fully online
   setTimeout(() => runTick(client).catch(() => {}), 60_000);
 
-  logger.info("Stock scheduler started (2h tick, 10m order matcher)");
+  logger.info("Stock scheduler started (2h tick, 10m order matcher, 5m ticker refresh)");
 }
