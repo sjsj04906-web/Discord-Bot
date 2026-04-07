@@ -572,33 +572,53 @@ export function buildTickerEmbed(
 
   const orderedCorps = CORPS.map((c) => states.find((s) => s.ticker === c.ticker)).filter(Boolean) as typeof states;
 
-  const embed = new EmbedBuilder()
-    .setColor(0x00FF88)
-    .setAuthor({ name: `⚡  Neural Data Exchange  ·  Live Market  ·  ${BOT_NAME}` })
-    .setDescription([
-      `### ${idxArrow} GLITCH Index — ${idx.toLocaleString("en-US")}  \`${idxPct}\``,
-      `${sentiment}  ·  Next price tick <t:${Math.floor(nextTickMs / 1000)}:R>`,
-    ].join("\n"))
-    .setFooter({ text: "Updates every minute  ·  /stocks view for analysis  ·  /stocks buy to trade" })
-    .setTimestamp();
+  // ANSI colour codes (render in Discord desktop; graceful plain fallback on mobile)
+  const R  = "\x1b[0m";   // reset
+  const B  = "\x1b[1m";   // bold
+  const D  = "\x1b[2m";   // dim
+  const G  = "\x1b[32m";  // green  (gain)
+  const RD = "\x1b[31m";  // red    (loss)
+  const Y  = "\x1b[33m";  // yellow (halt)
 
-  for (const s of orderedCorps) {
+  const header  = `${D}  TICK    PRICE        CHG      VOL   CORP${R}`;
+  const divider = `${D}  ──────────────────────────────────────────${R}`;
+
+  const rows = orderedCorps.map((s) => {
     const meta    = getCorpMeta(s.ticker);
     const halted  = isHalted(s.haltedUntil);
-    const arrow   = halted ? "🚧" : trendArrow(s.price, s.prevPrice);
-    const pct     = pctStr(s.price, s.prevPrice);
-    const price   = s.price.toLocaleString("en-US");
-    const vol     = s.volume24h.toLocaleString("en-US");
-    const chgLine = halted ? "**HALTED**" : `${arrow} \`${pct}\``;
+    const tick    = s.ticker.padEnd(4);
+    const price   = s.price.toLocaleString("en-US").padStart(7);
+    const vol     = s.volume24h.toLocaleString("en-US").padStart(5);
 
-    embed.addFields({
-      name:   `${s.ticker} · ${meta.name}`,
-      value:  `**${price}** coins\n${chgLine}  ·  VOL ${vol}`,
-      inline: true,
-    });
-  }
+    let chg: string;
+    if (halted) {
+      chg = `${Y}  HALT    ${R}`;
+    } else {
+      const p     = pctStr(s.price, s.prevPrice);
+      const up    = s.price > s.prevPrice;
+      const dn    = s.price < s.prevPrice;
+      const arrow = up ? "▲" : dn ? "▼" : "─";
+      const plain = `${arrow} ${p}`.padEnd(9);
+      chg = up ? `${G}${plain}${R}` : dn ? `${RD}${plain}${R}` : `${D}${plain}${R}`;
+    }
 
-  return embed;
+    return `  ${B}${tick}${R}  ${price}  ${chg}  ${vol}   ${meta.name}`;
+  });
+
+  const table = "```ansi\n" + [header, divider, ...rows].join("\n") + "\n```";
+
+  const desc = [
+    `**${idxArrow} GLITCH Index** — ${idx.toLocaleString("en-US")}  \`${idxPct}\``,
+    `${sentiment}  ·  Next price tick <t:${Math.floor(nextTickMs / 1000)}:R>`,
+    table,
+  ].join("\n");
+
+  return new EmbedBuilder()
+    .setColor(0x00FF88)
+    .setAuthor({ name: `⚡  Neural Data Exchange  ·  Live Market  ·  ${BOT_NAME}` })
+    .setDescription(desc)
+    .setFooter({ text: "Updates every minute  ·  /stocks view for analysis  ·  /stocks buy to trade" })
+    .setTimestamp();
 }
 
 // ─── Update the pinned live ticker message ────────────────────────────────────
