@@ -568,40 +568,37 @@ export function buildTickerEmbed(
   const idxArrow = trendArrow(idx, prevIdx);
   const idxPct   = pctStr(idx, prevIdx);
 
-  const sentiment = sentimentCount > 10
-    ? "🟢 Bullish"
-    : sentimentCount < 0
-      ? "🔴 Bearish"
-      : "⚪ Neutral";
+  const sentiment = sentimentCount > 10 ? "🟢 Bullish" : sentimentCount < 0 ? "🔴 Bearish" : "⚪ Neutral";
 
   const orderedCorps = CORPS.map((c) => states.find((s) => s.ticker === c.ticker)).filter(Boolean) as typeof states;
 
-  const rows = orderedCorps.map((s) => {
-    const meta    = getCorpMeta(s.ticker);
-    const arrow   = trendArrow(s.price, s.prevPrice);
-    const pct     = pctStr(s.price, s.prevPrice);
-    const halted  = isHalted(s.haltedUntil) ? "  🚧 HALT" : "";
-    const priceStr = s.price.toLocaleString("en-US").padStart(7);
-    const chgStr   = `${arrow}${pct}`.padEnd(9);
-    const volStr   = `VOL ${s.volume24h.toString().padStart(4)}`;
-    return ` ${s.ticker.padEnd(4)}  ${priceStr}  ${chgStr}  ${volStr}  ${meta.name}${halted}`;
-  });
-
-  const table = "```\n" + rows.join("\n") + "\n```";
-
-  const desc = [
-    `📊 **GLITCH Index** · ${idx.toLocaleString("en-US")}  ${idxArrow} ${idxPct}`,
-    `Sentiment: ${sentiment}  ·  Next tick <t:${Math.floor(nextTickMs / 1000)}:R>`,
-    SEP,
-    table,
-  ].join("\n");
-
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(0x00FF88)
     .setAuthor({ name: `⚡  Neural Data Exchange  ·  Live Market  ·  ${BOT_NAME}` })
-    .setDescription(desc)
-    .setFooter({ text: "Auto-updates every 2h  ·  /stocks view for full analysis  ·  /stocks buy to trade" })
+    .setDescription([
+      `### ${idxArrow} GLITCH Index — ${idx.toLocaleString("en-US")}  \`${idxPct}\``,
+      `${sentiment}  ·  Next price tick <t:${Math.floor(nextTickMs / 1000)}:R>`,
+    ].join("\n"))
+    .setFooter({ text: "Updates every minute  ·  /stocks view for analysis  ·  /stocks buy to trade" })
     .setTimestamp();
+
+  for (const s of orderedCorps) {
+    const meta    = getCorpMeta(s.ticker);
+    const halted  = isHalted(s.haltedUntil);
+    const arrow   = halted ? "🚧" : trendArrow(s.price, s.prevPrice);
+    const pct     = pctStr(s.price, s.prevPrice);
+    const price   = s.price.toLocaleString("en-US");
+    const vol     = s.volume24h.toLocaleString("en-US");
+    const chgLine = halted ? "**HALTED**" : `${arrow} \`${pct}\``;
+
+    embed.addFields({
+      name:   `${s.ticker} · ${meta.name}`,
+      value:  `**${price}** coins\n${chgLine}  ·  VOL ${vol}`,
+      inline: true,
+    });
+  }
+
+  return embed;
 }
 
 // ─── Update the pinned live ticker message ────────────────────────────────────
