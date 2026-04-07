@@ -5,7 +5,7 @@ import {
   CORPS, getCorpMeta, arbitronSignal, momentum9Signal, generateGridEvent,
   generateFlashCrash, applyDrift, applyImpactBps, priceImpact,
   sentimentDrift, circuitBreakerThreshold, isHalted, sectorBleed,
-  corpBondYield, junkBondYield,
+  corpBondYield, junkBondYield, glitchIndex, trendArrow,
 } from "./stockEngine.js";
 import {
   initMarket, getStates, getState, updatePrice, haltTrading, resetVolume24h,
