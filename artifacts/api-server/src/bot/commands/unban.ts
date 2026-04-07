@@ -16,7 +16,7 @@ export const data = new SlashCommandBuilder()
     o.setName("user_id").setDescription("The ID of the user to unban").setRequired(true)
   )
   .addStringOption((o) =>
-    o.setName("reason").setDescription("Reason for the unban").setRequired(false)
+    o.setName("reason").setDescription("Reason for the unban").setRequired(false).setAutocomplete(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {

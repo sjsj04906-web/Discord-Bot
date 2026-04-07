@@ -17,7 +17,7 @@ export const data = new SlashCommandBuilder()
     o.setName("user").setDescription("The member to remove").setRequired(true)
   )
   .addStringOption((o) =>
-    o.setName("reason").setDescription("Reason for removal").setRequired(false)
+    o.setName("reason").setDescription("Reason for removal").setRequired(false).setAutocomplete(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {

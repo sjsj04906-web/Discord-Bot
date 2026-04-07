@@ -33,7 +33,7 @@ export const data = new SlashCommandBuilder()
     return opt;
   })
   .addStringOption((o) =>
-    o.setName("reason").setDescription("Reason for the ban").setRequired(false)
+    o.setName("reason").setDescription("Reason for the ban").setRequired(false).setAutocomplete(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {

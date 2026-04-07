@@ -20,7 +20,7 @@ export const data = new SlashCommandBuilder()
     o.setName("user").setDescription("The member to warn").setRequired(true)
   )
   .addStringOption((o) =>
-    o.setName("reason").setDescription("Reason for the warning").setRequired(true)
+    o.setName("reason").setDescription("Reason for the warning").setRequired(true).setAutocomplete(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {

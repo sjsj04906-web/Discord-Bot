@@ -20,7 +20,7 @@ export const data = new SlashCommandBuilder()
     o.setName("user").setDescription("The member to ban").setRequired(true)
   )
   .addStringOption((o) =>
-    o.setName("reason").setDescription("Reason for the ban").setRequired(false)
+    o.setName("reason").setDescription("Reason for the ban").setRequired(false).setAutocomplete(true)
   )
   .addIntegerOption((o) =>
     o.setName("delete_days")

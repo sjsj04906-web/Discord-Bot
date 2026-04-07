@@ -32,7 +32,7 @@ export const data = new SlashCommandBuilder()
     return opt;
   })
   .addStringOption((o) =>
-    o.setName("reason").setDescription("Reason for the mute").setRequired(false)
+    o.setName("reason").setDescription("Reason for the mute").setRequired(false).setAutocomplete(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {

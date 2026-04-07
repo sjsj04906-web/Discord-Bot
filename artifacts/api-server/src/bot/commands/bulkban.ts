@@ -15,7 +15,7 @@ export const data = new SlashCommandBuilder()
     o.setName("ids").setDescription("User IDs to ban, separated by spaces or commas").setRequired(true)
   )
   .addStringOption((o) =>
-    o.setName("reason").setDescription("Reason applied to all bans").setRequired(false)
+    o.setName("reason").setDescription("Reason applied to all bans").setRequired(false).setAutocomplete(true)
   )
   .addIntegerOption((o) =>
     o.setName("delete_days").setDescription("Days of message history to delete (0–7, default 0)").setMinValue(0).setMaxValue(7).setRequired(false)

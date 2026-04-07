@@ -383,6 +383,27 @@ export function startBot(): void {
       return;
     }
 
+    // ── Autocomplete ─────────────────────────────────────────────────────────
+    if (interaction.isAutocomplete()) {
+      const focused = interaction.options.getFocused(true);
+      if (focused.name === "reason") {
+        const query = focused.value.toLowerCase();
+        const MOD_REASONS = [
+          "Spam", "Harassment", "NSFW content", "Hate speech",
+          "Advertising / self-promotion", "Toxicity / disruptive behaviour",
+          "Ban evasion", "Repeated rule violations", "Inappropriate username",
+          "Threats / doxxing", "Scamming", "Raiding / mass mention",
+          "Impersonation", "Leaking personal information", "Other",
+        ];
+        const choices = MOD_REASONS
+          .filter((r) => r.toLowerCase().includes(query))
+          .slice(0, 25)
+          .map((r) => ({ name: r, value: r }));
+        await interaction.respond(choices).catch(() => {});
+      }
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const command = commands.get(interaction.commandName);
