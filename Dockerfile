@@ -7,18 +7,16 @@ RUN corepack enable pnpm
 # Copy config files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc* tsconfig*.json ./
 
-# Copy source folders
+# Copy source code
 COPY artifacts ./artifacts
 COPY scripts ./scripts
 COPY lib ./lib
 
-# Install
+# Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Build WITHOUT strict type checking (this is the key change)
-RUN pnpm run build -- --noEmit false || echo "Typecheck skipped for deployment"
+# Build the project (this creates the .js files)
+RUN pnpm run build
 
-# Alternative: Force skip typecheck by overriding the script temporarily
-# If above doesn't work, we'll use this in next step
-
-CMD ["pnpm", "--filter", "./artifacts/**", "start"]
+# Run the compiled JavaScript version of your bot
+CMD ["node", "artifacts/api-server/dist/app.js"]
