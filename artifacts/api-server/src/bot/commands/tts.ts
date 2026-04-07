@@ -299,7 +299,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       adapterCreator: interaction.guild.voiceAdapterCreator,
       selfDeaf: false,
       debug: true,
-    });
+      // Disable DAVE E2E encryption — lets us isolate whether it's the culprit
+      daveEncryption: false,
+    } as Parameters<typeof joinVoiceChannel>[0]);
 
     connection.on("debug", (dbgMsg: string) => {
       logger.info({ dbgMsg }, "VoiceConn debug");
