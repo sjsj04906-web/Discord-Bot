@@ -9,6 +9,7 @@ router.get("/bot-status", (_req, res) => {
   const guilds = ready ? client.guilds.cache.size : 0;
   const members = ready ? client.guilds.cache.reduce((acc, g) => acc + g.memberCount, 0) : 0;
   const uptime = ready && client.uptime != null ? Math.floor(client.uptime / 1000) : 0;
+  const latency = ready ? client.ws.ping : -1;
 
   res.json({
     online: ready,
@@ -17,6 +18,7 @@ router.get("/bot-status", (_req, res) => {
     members,
     commands: allCommands.length,
     uptime,
+    latency,
     checkedAt: new Date().toISOString(),
   });
 });
