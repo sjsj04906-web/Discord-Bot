@@ -152,6 +152,22 @@ function playNext(session: TtsSession): void {
       playNext(session);
     });
 
+    // Inspect internal DAVE session state before playing
+    try {
+      const networking = (session.connection as any).state?.networking;
+      const daveWrapper = networking?.state?.dave;
+      const daveSession = daveWrapper?.session;
+      logger.info({
+        connectionStatus: session.connection.state.status,
+        daveProtocol: daveWrapper?.protocolVersion,
+        daveSessionReady: daveSession?.ready,
+        daveSessionStatus: daveSession?.status,
+        daveEpoch: daveSession?.epoch?.toString() ?? null,
+      }, "TTS DAVE state pre-play");
+    } catch (e) {
+      logger.warn({ err: (e as Error).message }, "TTS DAVE inspect error");
+    }
+
     logger.info({ playerStatus: session.player.state.status }, "TTS calling player.play()");
     session.player.play(resource);
   } catch (err) {
@@ -299,9 +315,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       adapterCreator: interaction.guild.voiceAdapterCreator,
       selfDeaf: false,
       debug: true,
-      // Disable DAVE E2E encryption — lets us isolate whether it's the culprit
-      daveEncryption: false,
-    } as Parameters<typeof joinVoiceChannel>[0]);
+    });
 
     connection.on("debug", (dbgMsg: string) => {
       logger.info({ dbgMsg }, "VoiceConn debug");
