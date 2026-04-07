@@ -301,12 +301,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       debug: true,
     });
 
-    connection.on("debug", (msg) => {
-      if (msg.includes("error") || msg.includes("Error") || msg.includes("DAVE") ||
-          msg.includes("Speaking") || msg.includes("send") || msg.includes("Ready") ||
-          msg.includes("packet") || msg.includes("Packet")) {
-        logger.info({ msg }, "VoiceConn debug");
-      }
+    connection.on("debug", (dbgMsg: string) => {
+      logger.info({ dbgMsg }, "VoiceConn debug");
     });
 
     // Wait up to 15 s for Ready state
