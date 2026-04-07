@@ -77,6 +77,7 @@ import * as bounty from "./bounty.js";
 import * as lottery from "./lottery.js";
 import * as quests from "./quests.js";
 import * as stocks from "./stocks.js";
+import * as tts from "./tts.js";
 
 export interface SlashCommand {
   data: SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
@@ -108,4 +109,5 @@ export const allCommands: SlashCommand[] = [
   autoresponder,
   market, bounty, lottery, quests,
   stocks,
+  tts,
 ];

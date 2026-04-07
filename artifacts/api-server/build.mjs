@@ -29,6 +29,11 @@ async function buildAll() {
     // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
     external: [
       "*.node",
+      // @discordjs/voice native deps — externalize only the prebuilt binary package;
+      // @snazzah/davey (the JS wrapper) gets bundled normally.
+      "@snazzah/davey-linux-x64-gnu",
+      // prism-media does a try/require('ffmpeg-static'); system FFmpeg is used instead
+      "ffmpeg-static",
       "sharp",
       "better-sqlite3",
       "sqlite3",
