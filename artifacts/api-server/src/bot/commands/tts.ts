@@ -12,7 +12,6 @@ import {
   createAudioResource,
   AudioPlayerStatus,
   VoiceConnectionStatus,
-  entersState,
   StreamType,
   getVoiceConnection,
   AudioPlayer,
@@ -20,6 +19,7 @@ import {
 } from "@discordjs/voice";
 import { Readable } from "node:stream";
 import { THEME } from "../theme.js";
+import { logger } from "../../lib/logger.js";
 
 // ── Session store ──────────────────────────────────────────────────────────────
 
@@ -220,7 +220,50 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       selfDeaf: false,
     });
 
-    await entersState(connection, VoiceConnectionStatus.Ready, 10_000);
+    // Wait for Ready; log every state transition so we can diagnose hangs
+    await new Promise<void>((resolve, reject) => {
+      let lastState = connection.state.status;
+      let settled = false;
+
+      const settle = (err?: Error) => {
+        if (settled) return;
+        settled = true;
+        connection.off("stateChange", onState);
+        clearTimeout(timer);
+        err ? reject(err) : resolve();
+      };
+
+      const onState = (_: unknown, next: { status: VoiceConnectionStatus }) => {
+        logger.info(
+          { from: lastState, to: next.status },
+          "TTS voice connection state change"
+        );
+        lastState = next.status;
+
+        if (next.status === VoiceConnectionStatus.Ready) {
+          settle();
+        } else if (next.status === VoiceConnectionStatus.Destroyed) {
+          settle(new Error(`Connection destroyed while in ${lastState}`));
+        }
+      };
+
+      // Already ready (edge-case)
+      if (connection.state.status === VoiceConnectionStatus.Ready) {
+        settle();
+        return;
+      }
+
+      connection.on("stateChange", onState);
+
+      const timer = setTimeout(() => {
+        settle(
+          new Error(
+            `Timed out waiting for voice (stuck at: ${lastState}). ` +
+            `Check bot permissions and that UDP is reachable.`
+          )
+        );
+      }, 20_000);
+    });
 
     const player = createAudioPlayer();
     connection.subscribe(player);
