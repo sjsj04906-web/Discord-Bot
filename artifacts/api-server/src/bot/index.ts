@@ -43,6 +43,7 @@ import { restorePendingTempRoles } from "./temproleScheduler.js";
 import { startWarnExpiryScheduler } from "./warnExpiryScheduler.js";
 import { startRetentionScheduler } from "./retentionScheduler.js";
 import { startStockScheduler, updateLiveTicker } from "./stockScheduler.js";
+import { handleTtsMessage } from "./commands/tts.js";
 import { bufferSentiment } from "./stockDb.js";
 import { getCommandRoles, getGuildConfig, updateGuildConfig, eraseUserData } from "./db.js";
 import { clearAfk, getAfk, isAfk } from "./utils/afkStore.js";
@@ -504,6 +505,9 @@ export function startBot(): void {
   client.on(Events.MessageCreate, async (message) => {
     // DMs are handled via the raw listener above; only process guild messages here
     if (!message.guildId || !message.guild || message.author.bot) return;
+
+    // ── TTS: enqueue message for voice channel playback if active ─────────────
+    handleTtsMessage(message);
 
     // ── Suggestion channel: intercept and convert to suggestion embed ─────────
     const suggConfig = await getGuildConfig(message.guildId).catch(() => null);

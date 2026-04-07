@@ -4,6 +4,7 @@ import {
   GuildMember,
   MessageFlags,
   EmbedBuilder,
+  Message,
 } from "discord.js";
 import {
   joinVoiceChannel,
@@ -14,39 +15,128 @@ import {
   entersState,
   StreamType,
   getVoiceConnection,
+  AudioPlayer,
+  VoiceConnection,
 } from "@discordjs/voice";
 import { Readable } from "node:stream";
 import { THEME } from "../theme.js";
 
+// ── Session store ──────────────────────────────────────────────────────────────
+
+interface TtsSession {
+  connection: VoiceConnection;
+  textChannelId: string;
+  voice: string;
+  player: AudioPlayer;
+  queue: string[];
+  playing: boolean;
+}
+
+const sessions = new Map<string, TtsSession>();
+
+// ── Text cleanup helpers ───────────────────────────────────────────────────────
+
+function cleanText(message: Message): string {
+  return message.content
+    // Resolve user mentions → display name
+    .replace(/<@!?(\d+)>/g, (_, id) => {
+      const m = message.guild?.members.cache.get(id);
+      return m?.displayName ?? "someone";
+    })
+    // Resolve channel mentions
+    .replace(/<#(\d+)>/g, (_, id) => {
+      const ch = message.guild?.channels.cache.get(id);
+      return ch ? `#${ch.name}` : "#channel";
+    })
+    // Role mentions
+    .replace(/<@&\d+>/g, "@role")
+    // Custom emoji → just the name
+    .replace(/<a?:(\w+):\d+>/g, "$1")
+    // Collapse URLs to "link"
+    .replace(/https?:\/\/\S+/g, "link")
+    .trim()
+    .slice(0, 200);
+}
+
+// ── Audio queue engine ─────────────────────────────────────────────────────────
+
+async function playNext(session: TtsSession): Promise<void> {
+  if (session.queue.length === 0) {
+    session.playing = false;
+    return;
+  }
+
+  const text = session.queue.shift()!;
+
+  try {
+    const url = `https://api.streamelements.com/kappa/v2/speech?voice=${session.voice}&text=${encodeURIComponent(text)}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+    const nodeStream = Readable.fromWeb(
+      res.body as Parameters<typeof Readable.fromWeb>[0]
+    );
+    const resource = createAudioResource(nodeStream, {
+      inputType: StreamType.Arbitrary,
+    });
+
+    session.player.play(resource);
+    session.player.once(AudioPlayerStatus.Idle, () => void playNext(session));
+  } catch {
+    // Skip this message and try the next one
+    void playNext(session);
+  }
+}
+
+function enqueueText(guildId: string, text: string): void {
+  const session = sessions.get(guildId);
+  if (!session) return;
+  session.queue.push(text);
+  if (!session.playing) {
+    session.playing = true;
+    void playNext(session);
+  }
+}
+
+// ── Public: called from the MessageCreate handler ─────────────────────────────
+
+export function handleTtsMessage(message: Message): void {
+  if (!message.guild || message.author.bot) return;
+
+  const session = sessions.get(message.guild.id);
+  if (!session || message.channelId !== session.textChannelId) return;
+
+  const text = cleanText(message);
+  if (!text) return;
+
+  enqueueText(message.guild.id, text);
+}
+
+// ── Slash command ──────────────────────────────────────────────────────────────
+
 const VOICES = [
-  { name: "Brian  —  UK Male",              value: "Brian" },
-  { name: "Amy    —  UK Female",            value: "Amy" },
-  { name: "Emma   —  UK Female (alt)",      value: "Emma" },
-  { name: "Joanna —  US Female",            value: "Joanna" },
-  { name: "Matthew — US Male",              value: "Matthew" },
-  { name: "Ivy    —  US Female (child)",    value: "Ivy" },
-  { name: "Nicole —  Australian Female",    value: "Nicole" },
-  { name: "Russell — Australian Male",      value: "Russell" },
+  { name: "Brian  —  UK Male",           value: "Brian" },
+  { name: "Amy    —  UK Female",         value: "Amy" },
+  { name: "Emma   —  UK Female (alt)",   value: "Emma" },
+  { name: "Joanna —  US Female",         value: "Joanna" },
+  { name: "Matthew — US Male",           value: "Matthew" },
+  { name: "Ivy    —  US Female (child)", value: "Ivy" },
+  { name: "Nicole —  Australian Female", value: "Nicole" },
+  { name: "Russell — Australian Male",   value: "Russell" },
 ];
 
 export const data = new SlashCommandBuilder()
   .setName("tts")
-  .setDescription("Text-to-speech in your voice channel")
+  .setDescription("Text-to-speech — reads every message in this channel aloud")
   .addSubcommand((sub) =>
     sub
-      .setName("say")
-      .setDescription("Bot joins your VC and reads the text aloud")
-      .addStringOption((o) =>
-        o
-          .setName("text")
-          .setDescription("What to say (max 200 chars)")
-          .setRequired(true)
-          .setMaxLength(200)
-      )
+      .setName("join")
+      .setDescription("Join your voice channel and start reading messages in this channel")
       .addStringOption((o) =>
         o
           .setName("voice")
-          .setDescription("TTS voice (default: Brian)")
+          .setDescription("TTS voice to use (default: Brian)")
           .setRequired(false)
           .addChoices(...VOICES)
       )
@@ -54,7 +144,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub
       .setName("stop")
-      .setDescription("Disconnect the bot from the voice channel")
+      .setDescription("Disconnect the bot and stop TTS mode")
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -65,33 +155,37 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const sub = interaction.options.getSubcommand();
 
-  // ── /tts stop ────────────────────────────────────────────────────────────
+  // ── /tts stop ──────────────────────────────────────────────────────────────
   if (sub === "stop") {
     const conn = getVoiceConnection(interaction.guild.id);
-    if (!conn) {
+    const hadSession = sessions.has(interaction.guild.id);
+
+    if (!conn && !hadSession) {
       await interaction.reply({
         embeds: [
           new EmbedBuilder()
             .setColor(THEME.danger)
-            .setDescription("❌ Not connected to any voice channel."),
+            .setDescription("❌ Not currently in TTS mode."),
         ],
         flags: MessageFlags.Ephemeral,
       });
       return;
     }
-    conn.destroy();
+
+    sessions.delete(interaction.guild.id);
+    conn?.destroy();
+
     await interaction.reply({
       embeds: [
         new EmbedBuilder()
           .setColor(THEME.success)
-          .setDescription("📴 Disconnected from voice."),
+          .setDescription("📴 TTS mode stopped."),
       ],
-      flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
-  // ── /tts say ─────────────────────────────────────────────────────────────
+  // ── /tts join ──────────────────────────────────────────────────────────────
   const member = interaction.member as GuildMember;
   const voiceChannel = member.voice.channel;
 
@@ -100,28 +194,25 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       embeds: [
         new EmbedBuilder()
           .setColor(THEME.danger)
-          .setDescription("❌ You need to join a voice channel first."),
+          .setDescription("❌ Join a voice channel first, then use `/tts join`."),
       ],
       flags: MessageFlags.Ephemeral,
     });
     return;
   }
 
-  const text  = interaction.options.getString("text", true);
   const voice = interaction.options.getString("voice") ?? "Brian";
 
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  // Tear down any existing session first
+  const existing = sessions.get(interaction.guild.id);
+  if (existing) {
+    existing.connection.destroy();
+    sessions.delete(interaction.guild.id);
+  }
+
+  await interaction.deferReply();
 
   try {
-    // Fetch TTS audio from StreamElements (free, no auth needed)
-    const ttsUrl = `https://api.streamelements.com/kappa/v2/speech?voice=${voice}&text=${encodeURIComponent(text)}`;
-    const res = await fetch(ttsUrl, { signal: AbortSignal.timeout(10_000) });
-
-    if (!res.ok || !res.body) {
-      throw new Error(`TTS API returned HTTP ${res.status}`);
-    }
-
-    // Join (or reuse) voice connection
     const connection = joinVoiceChannel({
       channelId: voiceChannel.id,
       guildId: interaction.guild.id,
@@ -129,45 +220,48 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       selfDeaf: false,
     });
 
-    // Wait for the connection to be ready (resolves instantly if already ready)
     await entersState(connection, VoiceConnectionStatus.Ready, 10_000);
-
-    // Convert Web ReadableStream → Node Readable, let FFmpeg decode MP3 → Opus
-    const nodeStream = Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]);
-    const resource   = createAudioResource(nodeStream, { inputType: StreamType.Arbitrary });
 
     const player = createAudioPlayer();
     connection.subscribe(player);
-    player.play(resource);
 
-    // Auto-disconnect when speech finishes
-    player.once(AudioPlayerStatus.Idle, () => {
-      connection.destroy();
-    });
+    const session: TtsSession = {
+      connection,
+      textChannelId: interaction.channelId,
+      voice,
+      player,
+      queue: [],
+      playing: false,
+    };
+    sessions.set(interaction.guild.id, session);
 
-    // Also clean up if the connection drops unexpectedly
+    // Auto-clean when the voice connection is torn down externally
     connection.once(VoiceConnectionStatus.Destroyed, () => {
-      player.stop(true);
+      sessions.delete(interaction.guild.id);
     });
 
-    const preview = text.length > 80 ? `${text.slice(0, 80)}…` : text;
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()
           .setColor(THEME.success)
-          .setDescription(`🔊 Speaking in **${voiceChannel.name}** · voice: **${voice}**`)
-          .setFooter({ text: `"${preview}"` }),
+          .setTitle("🔊 TTS Mode Active")
+          .setDescription(
+            `Joined **${voiceChannel.name}** and listening in <#${interaction.channelId}>.\n` +
+            `Every message sent here will be read aloud.\n\n` +
+            `Use \`/tts stop\` to disconnect.`
+          )
+          .addFields({ name: "Voice", value: voice, inline: true }),
       ],
     });
   } catch (err) {
-    // Tear down the voice connection if something went wrong mid-setup
     getVoiceConnection(interaction.guild.id)?.destroy();
+    sessions.delete(interaction.guild.id);
     const msg = err instanceof Error ? err.message : "Unknown error";
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()
           .setColor(THEME.danger)
-          .setDescription(`❌ TTS failed — ${msg}`),
+          .setDescription(`❌ Failed to join voice channel — ${msg}`),
       ],
     });
   }
