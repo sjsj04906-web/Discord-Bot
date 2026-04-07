@@ -18,7 +18,7 @@ import {
   VoiceConnection,
   VoiceUDPSocket,
 } from "@discordjs/voice";
-import { Readable } from "node:stream";
+import { spawn } from "node:child_process";
 import { THEME } from "../theme.js";
 import { logger } from "../../lib/logger.js";
 
@@ -101,7 +101,7 @@ function cleanText(message: Message): string {
 
 // ── Audio queue engine ─────────────────────────────────────────────────────────
 
-async function playNext(session: TtsSession): Promise<void> {
+function playNext(session: TtsSession): void {
   if (session.queue.length === 0) {
     session.playing = false;
     return;
@@ -110,23 +110,35 @@ async function playNext(session: TtsSession): Promise<void> {
   const text = session.queue.shift()!;
 
   try {
-    const url = `https://api.streamelements.com/kappa/v2/speech?voice=${session.voice}&text=${encodeURIComponent(text)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    // Spawn espeak-ng; pipe its WAV stdout into the audio player
+    const proc = spawn("espeak-ng", [
+      "-v", session.voice,
+      "-s", "155",   // words per minute (slightly slower for clarity)
+      "-a", "180",   // amplitude 0–200
+      "--stdout",
+      text,
+    ]);
 
-    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    proc.on("error", (err) => {
+      logger.warn({ err }, "TTS espeak-ng spawn error");
+      playNext(session);
+    });
 
-    const nodeStream = Readable.fromWeb(
-      res.body as Parameters<typeof Readable.fromWeb>[0]
-    );
-    const resource = createAudioResource(nodeStream, {
+    if (!proc.stdout) {
+      logger.warn("TTS espeak-ng: stdout unavailable");
+      playNext(session);
+      return;
+    }
+
+    const resource = createAudioResource(proc.stdout, {
       inputType: StreamType.Arbitrary,
     });
 
     session.player.play(resource);
-    session.player.once(AudioPlayerStatus.Idle, () => void playNext(session));
-  } catch {
-    // Skip this message and try the next one
-    void playNext(session);
+    session.player.once(AudioPlayerStatus.Idle, () => playNext(session));
+  } catch (err) {
+    logger.warn({ err }, "TTS playNext error");
+    playNext(session);
   }
 }
 
@@ -157,14 +169,14 @@ export function handleTtsMessage(message: Message): void {
 // ── Slash command ──────────────────────────────────────────────────────────────
 
 const VOICES = [
-  { name: "Brian  —  UK Male",           value: "Brian" },
-  { name: "Amy    —  UK Female",         value: "Amy" },
-  { name: "Emma   —  UK Female (alt)",   value: "Emma" },
-  { name: "Joanna —  US Female",         value: "Joanna" },
-  { name: "Matthew — US Male",           value: "Matthew" },
-  { name: "Ivy    —  US Female (child)", value: "Ivy" },
-  { name: "Nicole —  Australian Female", value: "Nicole" },
-  { name: "Russell — Australian Male",   value: "Russell" },
+  { name: "Default — Neutral",     value: "en" },
+  { name: "Male 1",                value: "en+m1" },
+  { name: "Male 2",                value: "en+m2" },
+  { name: "Male 3",                value: "en+m3" },
+  { name: "Female 1",              value: "en+f1" },
+  { name: "Female 2",              value: "en+f2" },
+  { name: "Female 3",              value: "en+f3" },
+  { name: "Female 4",              value: "en+f4" },
 ];
 
 export const data = new SlashCommandBuilder()
