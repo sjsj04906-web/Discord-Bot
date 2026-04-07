@@ -65,7 +65,12 @@ export function startBot(): void {
 
     try {
       const commandData = allCommands.map((c) => c.data.toJSON());
-      await readyClient.application.commands.set(commandData);
+      // Register per-guild — instant propagation vs up-to-1-hour for global commands.
+      // Also clear any stale global registrations to avoid duplicate entries.
+      await readyClient.application.commands.set([]);
+      await Promise.all(
+        readyClient.guilds.cache.map((guild) => guild.commands.set(commandData))
+      );
       printBanner(readyClient.user.tag, readyClient.guilds.cache.size, totalMembers, commandData.length);
     } catch (err) {
       logger.error({ err }, "Failed to register slash commands");
@@ -581,6 +586,17 @@ export function startBot(): void {
 
   client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
     await handleMessageUpdate(oldMessage, newMessage);
+  });
+
+  // Register commands instantly whenever the bot joins a new guild.
+  client.on(Events.GuildCreate, async (guild) => {
+    try {
+      const commandData = allCommands.map((c) => c.data.toJSON());
+      await guild.commands.set(commandData);
+      logger.info({ guild: guild.name }, "Registered commands in new guild");
+    } catch (err) {
+      logger.error({ err, guild: guild.name }, "Failed to register commands in new guild");
+    }
   });
 
   client.on(Events.GuildMemberAdd, async (member) => {
