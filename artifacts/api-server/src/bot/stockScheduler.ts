@@ -580,7 +580,7 @@ export function buildTickerEmbed(
   const RD = "\x1b[31m";  // red    (loss)
   const Y  = "\x1b[33m";  // yellow (halt)
 
-  const header  = `${D}  TICK    PRICE        CHG      VOL   CORP${R}`;
+  const header  = `${D}  ${"TICK".padEnd(4)}  ${"PRICE".padStart(7)}  ${"CHG".padEnd(9)}  ${"VOL".padStart(5)}   CORP${R}`;
   const divider = `${D}  ──────────────────────────────────────────${R}`;
 
   const rows = orderedCorps.map((s) => {
