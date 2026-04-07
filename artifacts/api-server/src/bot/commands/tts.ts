@@ -217,8 +217,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       channelId: voiceChannel.id,
       guildId: interaction.guild.id,
       adapterCreator: interaction.guild.voiceAdapterCreator,
-      selfDeaf: false,
+      selfDeaf: true,
+      debug: true,
     });
+
+    connection.on("debug", (msg) =>
+      logger.debug({ voiceDebug: msg }, "voice internal")
+    );
 
     // Wait for Ready; log every state transition so we can diagnose hangs
     await new Promise<void>((resolve, reject) => {
