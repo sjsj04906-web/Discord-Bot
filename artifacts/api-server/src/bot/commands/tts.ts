@@ -5,6 +5,7 @@ import {
   MessageFlags,
   EmbedBuilder,
   Message,
+  PermissionsBitField,
 } from "discord.js";
 import {
   joinVoiceChannel,
@@ -319,6 +320,29 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   const voice = interaction.options.getString("voice") ?? "en-gb";
+
+  // ── Permission sanity check ──────────────────────────────────────────────────
+  const botMember = interaction.guild.members.me;
+  if (botMember) {
+    const perms = voiceChannel.permissionsFor(botMember);
+    const canConnect = perms?.has(PermissionsBitField.Flags.Connect) ?? false;
+    const canSpeak   = perms?.has(PermissionsBitField.Flags.Speak)   ?? false;
+    logger.info({ canConnect, canSpeak, channelId: voiceChannel.id }, "TTS permission check");
+    if (!canSpeak) {
+      await interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(THEME.danger)
+            .setDescription(
+              `❌ GL1TCH is missing the **Speak** permission in **${voiceChannel.name}**.\n` +
+              `Grant it in Server Settings → Roles or Channel Permissions, then try again.`
+            ),
+        ],
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+  }
 
   // Tear down any existing session first
   const existing = sessions.get(interaction.guild.id);
