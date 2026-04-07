@@ -13,17 +13,17 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((s) =>
     s.setName("coinflip")
       .setDescription("Flip a coin — double or nothing")
-      .addStringOption((o) => o.setName("bet").setDescription('Amount to bet (or "all" / "max")').setRequired(true))
+      .addStringOption((o) => o.setName("bet").setDescription('Amount to bet (or "all" / "max")').setRequired(true).setAutocomplete(true))
   )
   .addSubcommand((s) =>
     s.setName("slots")
       .setDescription("Spin the slot machine")
-      .addStringOption((o) => o.setName("bet").setDescription('Amount to bet (or "all" / "max")').setRequired(true))
+      .addStringOption((o) => o.setName("bet").setDescription('Amount to bet (or "all" / "max")').setRequired(true).setAutocomplete(true))
   )
   .addSubcommand((s) =>
     s.setName("roulette")
       .setDescription("Bet on roulette")
-      .addStringOption((o) => o.setName("bet").setDescription('Amount to bet (or "all" / "max")').setRequired(true))
+      .addStringOption((o) => o.setName("bet").setDescription('Amount to bet (or "all" / "max")').setRequired(true).setAutocomplete(true))
       .addStringOption((o) =>
         o.setName("color").setDescription("Choose red, black, or green").setRequired(true)
           .addChoices(
@@ -36,7 +36,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((s) =>
     s.setName("blackjack")
       .setDescription("Play blackjack against the dealer")
-      .addStringOption((o) => o.setName("bet").setDescription('Amount to bet (or "all" / "max")').setRequired(true))
+      .addStringOption((o) => o.setName("bet").setDescription('Amount to bet (or "all" / "max")').setRequired(true).setAutocomplete(true))
   );
 
 // ─── Slot machine ─────────────────────────────────────────────────────────────

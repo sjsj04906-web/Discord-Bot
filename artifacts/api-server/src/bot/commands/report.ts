@@ -15,7 +15,7 @@ export const data = new SlashCommandBuilder()
     o.setName("user").setDescription("User to report").setRequired(true)
   )
   .addStringOption((o) =>
-    o.setName("reason").setDescription("What did they do?").setRequired(true)
+    o.setName("reason").setDescription("What did they do?").setRequired(true).setAutocomplete(true)
   )
   .addStringOption((o) =>
     o.setName("evidence").setDescription("Message link or extra context (optional)").setRequired(false)

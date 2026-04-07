@@ -386,8 +386,9 @@ export function startBot(): void {
     // ── Autocomplete ─────────────────────────────────────────────────────────
     if (interaction.isAutocomplete()) {
       const focused = interaction.options.getFocused(true);
+      const query = focused.value.toLowerCase();
+
       if (focused.name === "reason") {
-        const query = focused.value.toLowerCase();
         const MOD_REASONS = [
           "Spam", "Harassment", "NSFW content", "Hate speech",
           "Advertising / self-promotion", "Toxicity / disruptive behaviour",
@@ -395,11 +396,43 @@ export function startBot(): void {
           "Threats / doxxing", "Scamming", "Raiding / mass mention",
           "Impersonation", "Leaking personal information", "Other",
         ];
-        const choices = MOD_REASONS
-          .filter((r) => r.toLowerCase().includes(query))
-          .slice(0, 25)
-          .map((r) => ({ name: r, value: r }));
-        await interaction.respond(choices).catch(() => {});
+        await interaction.respond(
+          MOD_REASONS
+            .filter((r) => r.toLowerCase().includes(query))
+            .slice(0, 25)
+            .map((r) => ({ name: r, value: r }))
+        ).catch(() => {});
+
+      } else if (focused.name === "duration" || focused.name === "in") {
+        const DURATIONS = [
+          "5m", "10m", "15m", "30m", "45m",
+          "1h", "2h", "4h", "6h", "12h",
+          "1d", "2d", "3d", "7d", "14d", "28d",
+        ];
+        await interaction.respond(
+          DURATIONS
+            .filter((d) => d.includes(query) || query === "")
+            .slice(0, 25)
+            .map((d) => ({ name: d, value: d }))
+        ).catch(() => {});
+
+      } else if (focused.name === "command") {
+        await interaction.respond(
+          [...commands.keys()]
+            .filter((c) => c.includes(query))
+            .sort()
+            .slice(0, 25)
+            .map((c) => ({ name: c, value: c }))
+        ).catch(() => {});
+
+      } else if (focused.name === "bet" || focused.name === "amount") {
+        const STAKES = ["100", "250", "500", "1000", "2500", "5000", "10000", "25000", "all", "max"];
+        await interaction.respond(
+          STAKES
+            .filter((s) => s.includes(query) || query === "")
+            .slice(0, 25)
+            .map((s) => ({ name: s, value: s }))
+        ).catch(() => {});
       }
       return;
     }

@@ -23,7 +23,7 @@ export const data = new SlashCommandBuilder()
     sub.setName("close")
       .setDescription("Close this mod mail thread and notify the user")
       .addStringOption((o) =>
-        o.setName("reason").setDescription("Closing reason (sent to user)").setRequired(false)
+        o.setName("reason").setDescription("Closing reason (sent to user)").setRequired(false).setAutocomplete(true)
       )
   )
   .addSubcommand((sub) =>

@@ -40,7 +40,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub.setName("set")
       .setDescription("Set a reminder")
-      .addStringOption((o) => o.setName("in").setDescription("When to remind you (e.g. 10m, 2h, 1d)").setRequired(true))
+      .addStringOption((o) => o.setName("in").setDescription("When to remind you (e.g. 10m, 2h, 1d)").setRequired(true).setAutocomplete(true))
       .addStringOption((o) => o.setName("message").setDescription("What to remind you about").setRequired(true))
   )
   .addSubcommand((sub) =>

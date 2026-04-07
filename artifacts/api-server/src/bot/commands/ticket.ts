@@ -27,7 +27,7 @@ export const data = new SlashCommandBuilder()
     sub.setName("close")
       .setDescription("Close this ticket channel")
       .addStringOption((o) =>
-        o.setName("reason").setDescription("Reason for closing").setRequired(false)
+        o.setName("reason").setDescription("Reason for closing").setRequired(false).setAutocomplete(true)
       )
   )
   .addSubcommand((sub) =>

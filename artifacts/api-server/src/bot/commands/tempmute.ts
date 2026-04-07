@@ -16,7 +16,7 @@ export const data = new SlashCommandBuilder()
     o.setName("user").setDescription("Member to mute").setRequired(true)
   )
   .addStringOption((o) =>
-    o.setName("duration").setDescription("Duration e.g. 10m 1h 2d (max 28d)").setRequired(true)
+    o.setName("duration").setDescription("Duration e.g. 10m 1h 2d (max 28d)").setRequired(true).setAutocomplete(true)
   )
   .addStringOption((o) =>
     o.setName("reason").setDescription("Reason for the mute").setRequired(false).setAutocomplete(true)

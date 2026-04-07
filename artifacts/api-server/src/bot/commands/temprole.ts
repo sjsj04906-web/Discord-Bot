@@ -20,7 +20,7 @@ export const data = new SlashCommandBuilder()
     o.setName("role").setDescription("Role to assign").setRequired(true)
   )
   .addStringOption((o) =>
-    o.setName("duration").setDescription("Duration e.g. 1h 2d 30m").setRequired(true)
+    o.setName("duration").setDescription("Duration e.g. 1h 2d 30m").setRequired(true).setAutocomplete(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {

@@ -17,14 +17,14 @@ export const data = new SlashCommandBuilder()
     s.setName("deposit")
       .setDescription("Move coins from your wallet into the bank")
       .addStringOption((o) =>
-        o.setName("amount").setDescription('Amount to deposit (or "all")').setRequired(true)
+        o.setName("amount").setDescription('Amount to deposit (or "all")').setRequired(true).setAutocomplete(true)
       )
   )
   .addSubcommand((s) =>
     s.setName("withdraw")
       .setDescription("Move coins from the bank back to your wallet")
       .addStringOption((o) =>
-        o.setName("amount").setDescription('Amount to withdraw (or "all")').setRequired(true)
+        o.setName("amount").setDescription('Amount to withdraw (or "all")').setRequired(true).setAutocomplete(true)
       )
   );
 

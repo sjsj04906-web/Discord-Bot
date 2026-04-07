@@ -41,7 +41,7 @@ export const data = new SlashCommandBuilder()
   .setName("duel")
   .setDescription("Challenge another user to a high-stakes coinflip duel")
   .addUserOption((o) => o.setName("opponent").setDescription("Who to challenge").setRequired(true))
-  .addStringOption((o) => o.setName("amount").setDescription('Stake amount (or "all")').setRequired(true));
+  .addStringOption((o) => o.setName("amount").setDescription('Stake amount (or "all")').setRequired(true).setAutocomplete(true));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild) return;

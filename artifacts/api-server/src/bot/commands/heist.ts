@@ -31,7 +31,7 @@ export const data = new SlashCommandBuilder()
   .setName("heist")
   .setDescription("Start a crew heist — others can join and share the risk & reward")
   .addStringOption((o) =>
-    o.setName("bet").setDescription(`Bet per player (min ${MIN_BET}, or "all")`).setRequired(true)
+    o.setName("bet").setDescription(`Bet per player (min ${MIN_BET}, or "all")`).setRequired(true).setAutocomplete(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {

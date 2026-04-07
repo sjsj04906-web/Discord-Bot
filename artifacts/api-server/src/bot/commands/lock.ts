@@ -16,7 +16,7 @@ export const data = new SlashCommandBuilder()
     o.setName("channel").setDescription("Channel to lock (defaults to current)").setRequired(false)
   )
   .addStringOption((o) =>
-    o.setName("reason").setDescription("Reason for locking").setRequired(false)
+    o.setName("reason").setDescription("Reason for locking").setRequired(false).setAutocomplete(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {

@@ -25,7 +25,7 @@ export const data = new SlashCommandBuilder()
         o.setName("id").setDescription("Case ID number").setRequired(true).setMinValue(1)
       )
       .addStringOption((o) =>
-        o.setName("reason").setDescription("New reason text").setRequired(true)
+        o.setName("reason").setDescription("New reason text").setRequired(true).setAutocomplete(true)
       )
   );
 

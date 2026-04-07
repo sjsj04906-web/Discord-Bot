@@ -15,13 +15,13 @@ export const data = new SlashCommandBuilder()
     s.setName("approve")
       .setDescription("Approve a suggestion")
       .addIntegerOption((o) => o.setName("id").setDescription("Suggestion ID").setRequired(true).setMinValue(1))
-      .addStringOption((o) => o.setName("reason").setDescription("Optional reason").setRequired(false))
+      .addStringOption((o) => o.setName("reason").setDescription("Optional reason").setRequired(false).setAutocomplete(true))
   )
   .addSubcommand((s) =>
     s.setName("deny")
       .setDescription("Deny a suggestion")
       .addIntegerOption((o) => o.setName("id").setDescription("Suggestion ID").setRequired(true).setMinValue(1))
-      .addStringOption((o) => o.setName("reason").setDescription("Optional reason").setRequired(false))
+      .addStringOption((o) => o.setName("reason").setDescription("Optional reason").setRequired(false).setAutocomplete(true))
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
