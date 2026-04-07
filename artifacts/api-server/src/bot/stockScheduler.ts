@@ -643,7 +643,7 @@ export function startStockScheduler(client: Client): void {
   const TICK_MS         = 2 * 60 * 60_000;  // 2 hours
   const ORDER_MATCH_MS  = 10 * 60_000;       // 10 minutes
   const SENTIMENT_MS    = 5 * 60_000;        // 5 minutes
-  const TICKER_MS       = 5 * 60_000;        // 5 minutes
+  const TICKER_MS       = 1 * 60_000;        // 1 minute
 
   // Flush sentiment buffer every 5 minutes
   setInterval(() => flushSentiment().catch(() => {}), SENTIMENT_MS);
@@ -660,5 +660,5 @@ export function startStockScheduler(client: Client): void {
   // Delay first tick by 60 seconds so the bot is fully online
   setTimeout(() => runTick(client).catch(() => {}), 60_000);
 
-  logger.info("Stock scheduler started (2h tick, 10m order matcher, 5m ticker refresh)");
+  logger.info("Stock scheduler started (2h tick, 10m order matcher, 1m ticker refresh)");
 }
