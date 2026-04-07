@@ -128,7 +128,7 @@ function playNext(session: TtsSession): void {
       "-ar", "48000", "-ac", "2",
       "-b:a", "96k",
       "-frame_duration", "20",
-      "-f", "ogg",
+      "-f", "webm",
       "pipe:1",
     ]);
 
@@ -159,7 +159,7 @@ function playNext(session: TtsSession): void {
     }
 
     const resource = createAudioResource(ffmpeg.stdout, {
-      inputType: StreamType.OggOpus,
+      inputType: StreamType.WebmOpus,
     });
 
     resource.playStream.on("error", (err) =>
@@ -396,6 +396,35 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         () => settle(new Error("Timed out connecting to the voice channel.")),
         15_000
       );
+    });
+
+    // ── DAVE encrypt diagnostic (first 3 packets only) ───────────────────────────
+    // Applied after "transitioned" (DAVE epoch 1 active) so session.ready is true
+    connection.once("transitioned", () => {
+      try {
+        const net = (connection as any).state?.networking;
+        const dave = net?.state?.dave;
+        if (dave && typeof dave.encrypt === "function") {
+          let count = 0;
+          const orig = dave.encrypt.bind(dave);
+          dave.encrypt = (packet: Buffer) => {
+            const out = orig(packet);
+            if (count++ < 3) {
+              logger.info({
+                inBytes: packet.length,
+                outBytes: out.length,
+                changed: !packet.equals(out),
+              }, `TTS DAVE encrypt sample #${count}`);
+            }
+            return out;
+          };
+          logger.info("TTS DAVE encrypt diagnostic installed");
+        } else {
+          logger.warn({ hasDave: !!dave }, "TTS DAVE encrypt diagnostic: no encrypt fn");
+        }
+      } catch (e) {
+        logger.warn({ err: (e as Error).message }, "TTS DAVE encrypt diagnostic failed");
+      }
     });
 
     // ── DAVE transition-0 fix ────────────────────────────────────────────────────
