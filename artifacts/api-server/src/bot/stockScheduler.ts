@@ -602,7 +602,8 @@ export function buildTickerEmbed(
       chg = up ? `${G}${plain}${R}` : dn ? `${RD}${plain}${R}` : `${D}${plain}${R}`;
     }
 
-    return `  ${B}${tick}${R}  ${price}  ${chg}  ${vol}   ${meta.name}`;
+    const name = meta.name.length > 13 ? meta.name.slice(0, 12) + "…" : meta.name.padEnd(13);
+    return `  ${B}${tick}${R}  ${price}  ${chg}  ${vol}   ${name}`;
   });
 
   const table = "```ansi\n" + [header, divider, ...rows].join("\n") + "\n```";
