@@ -108,21 +108,27 @@ function playNext(session: TtsSession): void {
   }
 
   const text = session.queue.shift()!;
+  logger.info({ text }, "TTS playNext: spawning espeak-ng");
 
   try {
-    // Spawn espeak-ng; pipe its WAV stdout into the audio player
     const proc = spawn("espeak-ng", [
       "-v", session.voice,
-      "-s", "155",   // words per minute (slightly slower for clarity)
-      "-a", "180",   // amplitude 0–200
+      "-s", "155",
+      "-a", "180",
       "--stdout",
       text,
     ]);
 
+    proc.stderr.on("data", (d: Buffer) =>
+      logger.warn({ stderr: d.toString().trim() }, "TTS espeak-ng stderr")
+    );
     proc.on("error", (err) => {
       logger.warn({ err }, "TTS espeak-ng spawn error");
       playNext(session);
     });
+    proc.on("exit", (code) =>
+      logger.info({ code }, "TTS espeak-ng exited")
+    );
 
     if (!proc.stdout) {
       logger.warn("TTS espeak-ng: stdout unavailable");
@@ -134,8 +140,20 @@ function playNext(session: TtsSession): void {
       inputType: StreamType.Arbitrary,
     });
 
+    resource.playStream.on("error", (err) =>
+      logger.warn({ err }, "TTS audio stream error")
+    );
+
+    session.player.on("error", (err) =>
+      logger.warn({ err }, "TTS audio player error")
+    );
+    session.player.once(AudioPlayerStatus.Idle, () => {
+      logger.info("TTS player idle → next");
+      playNext(session);
+    });
+
+    logger.info({ playerStatus: session.player.state.status }, "TTS calling player.play()");
     session.player.play(resource);
-    session.player.once(AudioPlayerStatus.Idle, () => playNext(session));
   } catch (err) {
     logger.warn({ err }, "TTS playNext error");
     playNext(session);
@@ -158,9 +176,18 @@ export function handleTtsMessage(message: Message): void {
   if (!message.guild || message.author.bot) return;
 
   const session = sessions.get(message.guild.id);
-  if (!session || message.channelId !== session.textChannelId) return;
+  if (!session) return;
+
+  if (message.channelId !== session.textChannelId) {
+    logger.info(
+      { msgChannel: message.channelId, ttsChannel: session.textChannelId },
+      "TTS: message in wrong channel, ignoring"
+    );
+    return;
+  }
 
   const text = cleanText(message);
+  logger.info({ text, queueLen: session.queue.length, playing: session.playing }, "TTS: enqueuing message");
   if (!text) return;
 
   enqueueText(message.guild.id, text);
