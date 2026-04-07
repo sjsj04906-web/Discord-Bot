@@ -42,9 +42,9 @@ import { restorePendingTempBans } from "./tempbanScheduler.js";
 import { restorePendingTempRoles } from "./temproleScheduler.js";
 import { startWarnExpiryScheduler } from "./warnExpiryScheduler.js";
 import { startRetentionScheduler } from "./retentionScheduler.js";
-import { startStockScheduler } from "./stockScheduler.js";
+import { startStockScheduler, updateLiveTicker } from "./stockScheduler.js";
 import { bufferSentiment } from "./stockDb.js";
-import { getCommandRoles, getGuildConfig, eraseUserData } from "./db.js";
+import { getCommandRoles, getGuildConfig, updateGuildConfig, eraseUserData } from "./db.js";
 import { clearAfk, getAfk, isAfk } from "./utils/afkStore.js";
 import { logger } from "../lib/logger.js";
 import { THEME, BOT_NAME } from "./theme.js";
@@ -451,6 +451,18 @@ export function startBot(): void {
     if (suggConfig?.suggestionChannelId && message.channelId === suggConfig.suggestionChannelId) {
       await handleSuggestionMessage(message);
       return;
+    }
+
+    // ── Ticker channel: bump ticker to the bottom ────────────────────────────
+    if (suggConfig?.tickerChannelId && message.channelId === suggConfig.tickerChannelId) {
+      // Delete the old ticker message so the next updateLiveTicker posts fresh at the bottom
+      if (suggConfig.tickerMessageId && message.channel.isTextBased()) {
+        const old = await message.channel.messages.fetch(suggConfig.tickerMessageId).catch(() => null);
+        if (old) await old.delete().catch(() => {});
+      }
+      await updateGuildConfig(message.guildId, { tickerMessageId: "" });
+      await updateLiveTicker(client, message.guildId).catch(() => {});
+      // Fall through — still process XP, automod, etc.
     }
 
     // ── AFK: clear status if AFK user sends a message ────────────────────────

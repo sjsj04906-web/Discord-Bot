@@ -606,7 +606,7 @@ export function buildTickerEmbed(
 
 // ─── Update the pinned live ticker message ────────────────────────────────────
 
-async function updateLiveTicker(client: Client, guildId: string): Promise<void> {
+export async function updateLiveTicker(client: Client, guildId: string): Promise<void> {
   try {
     const config = await getGuildConfig(guildId);
     if (!config.tickerChannelId) return;
