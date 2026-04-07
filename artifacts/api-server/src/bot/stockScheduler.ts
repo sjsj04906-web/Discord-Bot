@@ -22,9 +22,9 @@ import {
   getNeuralBankRate,
   getExpiredTakeovers, setTakeoverStatus,
 } from "./stockDb.js";
-import { addBalance, deductBalance } from "./db.js";
+import { addBalance, deductBalance, getGuildConfig, updateGuildConfig } from "./db.js";
 import { logger } from "../lib/logger.js";
-import { THEME, BOT_NAME } from "./theme.js";
+import { THEME, BOT_NAME, SEP } from "./theme.js";
 
 // ─── Find announcement channel ────────────────────────────────────────────────
 
@@ -248,6 +248,9 @@ async function processTick(client: Client, guildId: string) {
   if (allPending.length === 0) {
     await scheduleAllEarnings(guildId);
   }
+
+  // ── Update pinned live ticker message ──────────────────────────────────────
+  await updateLiveTicker(client, guildId);
 }
 
 async function scheduleAllEarnings(guildId: string) {
@@ -536,6 +539,93 @@ export async function executeSell(
   }
 
   return proceeds;
+}
+
+// ─── Live ticker embed builder ────────────────────────────────────────────────
+
+export function buildTickerEmbed(
+  states: Awaited<ReturnType<typeof getStates>>,
+  sentimentCount: number,
+  nextTickMs: number,
+): EmbedBuilder {
+  const priceMap: Record<string, number> = {};
+  const prevMap:  Record<string, number> = {};
+  for (const s of states) {
+    priceMap[s.ticker] = s.price;
+    prevMap[s.ticker]  = s.prevPrice;
+  }
+  const idx     = Math.round(glitchIndex(priceMap));
+  const prevIdx = Math.round(glitchIndex(prevMap));
+  const idxArrow = trendArrow(idx, prevIdx);
+  const idxPct   = pctStr(idx, prevIdx);
+
+  const sentiment = sentimentCount > 10
+    ? "🟢 Bullish"
+    : sentimentCount < 0
+      ? "🔴 Bearish"
+      : "⚪ Neutral";
+
+  const orderedCorps = CORPS.map((c) => states.find((s) => s.ticker === c.ticker)).filter(Boolean) as typeof states;
+
+  const rows = orderedCorps.map((s) => {
+    const meta    = getCorpMeta(s.ticker);
+    const arrow   = trendArrow(s.price, s.prevPrice);
+    const pct     = pctStr(s.price, s.prevPrice);
+    const halted  = isHalted(s.haltedUntil) ? "  🚧 HALT" : "";
+    const priceStr = s.price.toLocaleString("en-US").padStart(7);
+    const chgStr   = `${arrow}${pct}`.padEnd(9);
+    const volStr   = `VOL ${s.volume24h.toString().padStart(4)}`;
+    return ` ${s.ticker.padEnd(4)}  ${priceStr}  ${chgStr}  ${volStr}  ${meta.name}${halted}`;
+  });
+
+  const table = "```\n" + rows.join("\n") + "\n```";
+
+  const desc = [
+    `📊 **GLITCH Index** · ${idx.toLocaleString("en-US")}  ${idxArrow} ${idxPct}`,
+    `Sentiment: ${sentiment}  ·  Next tick <t:${Math.floor(nextTickMs / 1000)}:R>`,
+    SEP,
+    table,
+  ].join("\n");
+
+  return new EmbedBuilder()
+    .setColor(0x00FF88)
+    .setAuthor({ name: `⚡  Neural Data Exchange  ·  Live Market  ·  ${BOT_NAME}` })
+    .setDescription(desc)
+    .setFooter({ text: "Auto-updates every 2h  ·  /stocks view for full analysis  ·  /stocks buy to trade" })
+    .setTimestamp();
+}
+
+// ─── Update the pinned live ticker message ────────────────────────────────────
+
+async function updateLiveTicker(client: Client, guildId: string): Promise<void> {
+  try {
+    const config = await getGuildConfig(guildId);
+    if (!config.tickerChannelId) return;
+
+    const states = await getStates(guildId);
+    const sentMsg = await getSentimentCount(guildId);
+    const nextTickMs = Date.now() + 2 * 60 * 60_000;
+    const embed = buildTickerEmbed(states, sentMsg, nextTickMs);
+
+    const guild = await client.guilds.fetch(guildId).catch(() => null);
+    if (!guild) return;
+    const ch = guild.channels.cache.get(config.tickerChannelId) as import("discord.js").TextChannel | undefined;
+    if (!ch?.isTextBased()) return;
+
+    if (config.tickerMessageId) {
+      const existing = await ch.messages.fetch(config.tickerMessageId).catch(() => null);
+      if (existing) {
+        await existing.edit({ embeds: [embed] });
+        return;
+      }
+    }
+
+    // Message gone — send a fresh one and persist the new ID
+    const msg = await ch.send({ embeds: [embed] });
+    await updateGuildConfig(guildId, { tickerMessageId: msg.id });
+  } catch (err) {
+    logger.error({ err, guildId }, "Live ticker update failed");
+  }
 }
 
 // ─── Scheduler entry point ────────────────────────────────────────────────────

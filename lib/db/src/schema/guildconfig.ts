@@ -44,6 +44,8 @@ export const guildConfigTable = pgTable("guild_config", {
   currencyEmoji:          text("currency_emoji").default("🪙").notNull(),
   dailyAmount:            integer("daily_amount").default(100).notNull(),
   workCooldownMins:       integer("work_cooldown_mins").default(60).notNull(),
+  tickerChannelId:        text("ticker_channel_id").default("").notNull(),
+  tickerMessageId:        text("ticker_message_id").default("").notNull(),
 });
 
 export const insertGuildConfigSchema = createInsertSchema(guildConfigTable);

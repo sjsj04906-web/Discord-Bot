@@ -24,9 +24,10 @@ import {
   getBotStates, getPriceHistory,
   bufferSentiment,
   scheduleEarnings,
+  getSentimentCount,
 } from "../stockDb.js";
-import { executeBuy, executeSell } from "../stockScheduler.js";
-import { getBalance, deductBalance, addBalance, getGuildConfig } from "../db.js";
+import { executeBuy, executeSell, buildTickerEmbed } from "../stockScheduler.js";
+import { getBalance, deductBalance, addBalance, getGuildConfig, updateGuildConfig } from "../db.js";
 
 async function walletBalance(guildId: string, userId: string): Promise<number> {
   return (await getBalance(guildId, userId)).balance;
@@ -177,7 +178,22 @@ export const data = new SlashCommandBuilder()
       .addIntegerOption((o) => o.setName("set").setDescription("New rate in basis points (50–2000). Omit to just view.").setMinValue(50).setMaxValue(2_000)))
     .addSubcommand((s) => s
       .setName("earnings")
-      .setDescription("Schedule earnings reports for all corps (admin only)")));
+      .setDescription("Schedule earnings reports for all corps (admin only)")))
+
+  // ── Live ticker subcommand group ───────────────────────────────────────────
+  .addSubcommandGroup((g) => g
+    .setName("ticker")
+    .setDescription("Live Discord market ticker — auto-updating channel embed every 2h")
+    .addSubcommand((s) => s
+      .setName("setup")
+      .setDescription("Pin a live market ticker in a channel — auto-updates on every price tick")
+      .addChannelOption((o) => o
+        .setName("channel")
+        .setDescription("Text channel to post the live ticker in")
+        .setRequired(true)))
+    .addSubcommand((s) => s
+      .setName("stop")
+      .setDescription("Remove the live market ticker from this server")));
 
 // ─── Execute ──────────────────────────────────────────────────────────────────
 
@@ -214,6 +230,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   if (group === "admin") {
     if (sub === "rate")     return handleAdminRate(interaction, guildId, userId);
     if (sub === "earnings") return handleAdminEarnings(interaction, guildId, userId);
+    return;
+  }
+  if (group === "ticker") {
+    if (sub === "setup") return handleTickerSetup(interaction, guildId);
+    if (sub === "stop")  return handleTickerStop(interaction, guildId);
     return;
   }
 
@@ -1229,4 +1250,76 @@ async function handleAdminEarnings(interaction: ChatInputCommandInteraction, gui
   }
 
   await interaction.editReply("✅ Earnings reports scheduled for all 8 corps. Use `/stocks earnings` to see the calendar.");
+}
+
+// ─── /stocks ticker setup ─────────────────────────────────────────────────────
+
+async function handleTickerSetup(interaction: ChatInputCommandInteraction, guildId: string) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const member = interaction.guild!.members.cache.get(interaction.user.id);
+  const hasPerms = interaction.guild!.ownerId === interaction.user.id
+    || member?.permissions.has(PermissionFlagsBits.ManageGuild);
+  if (!hasPerms) {
+    await interaction.editReply("❌ You need **Manage Server** permission to set up the live ticker.");
+    return;
+  }
+
+  const channel = interaction.options.getChannel("channel", true);
+  if (!channel.isTextBased()) {
+    await interaction.editReply("❌ Please select a text channel.");
+    return;
+  }
+
+  const textChannel = interaction.guild!.channels.cache.get(channel.id) as import("discord.js").TextChannel;
+  if (!textChannel?.isTextBased()) {
+    await interaction.editReply("❌ Cannot send messages to that channel.");
+    return;
+  }
+
+  const states   = await getStates(guildId);
+  const sentMsg  = await getSentimentCount(guildId);
+  const nextTickMs = Date.now() + 2 * 60 * 60_000;
+  const embed    = buildTickerEmbed(states, sentMsg, nextTickMs);
+  const msg      = await textChannel.send({ embeds: [embed] });
+
+  await updateGuildConfig(guildId, {
+    tickerChannelId: channel.id,
+    tickerMessageId: msg.id,
+  });
+
+  await interaction.editReply(
+    `✅ Live market ticker posted in <#${channel.id}> and will auto-update every 2 hours on each price tick.\n\n📌 **Tip:** Pin the message so your traders can always find it!`,
+  );
+}
+
+// ─── /stocks ticker stop ──────────────────────────────────────────────────────
+
+async function handleTickerStop(interaction: ChatInputCommandInteraction, guildId: string) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const member = interaction.guild!.members.cache.get(interaction.user.id);
+  const hasPerms = interaction.guild!.ownerId === interaction.user.id
+    || member?.permissions.has(PermissionFlagsBits.ManageGuild);
+  if (!hasPerms) {
+    await interaction.editReply("❌ You need **Manage Server** permission to stop the ticker.");
+    return;
+  }
+
+  const config = await getGuildConfig(guildId);
+  if (!config.tickerChannelId) {
+    await interaction.editReply("❌ No live ticker is active in this server.");
+    return;
+  }
+
+  try {
+    const ch = interaction.guild!.channels.cache.get(config.tickerChannelId) as import("discord.js").TextChannel | undefined;
+    if (ch?.isTextBased() && config.tickerMessageId) {
+      const msg = await ch.messages.fetch(config.tickerMessageId).catch(() => null);
+      if (msg) await msg.delete();
+    }
+  } catch { /* ignore */ }
+
+  await updateGuildConfig(guildId, { tickerChannelId: "", tickerMessageId: "" });
+  await interaction.editReply("✅ Live market ticker removed.");
 }
