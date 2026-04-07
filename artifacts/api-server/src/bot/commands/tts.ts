@@ -196,14 +196,14 @@ export function handleTtsMessage(message: Message): void {
 // ── Slash command ──────────────────────────────────────────────────────────────
 
 const VOICES = [
-  { name: "Default — Neutral",     value: "en" },
-  { name: "Male 1",                value: "en+m1" },
-  { name: "Male 2",                value: "en+m2" },
-  { name: "Male 3",                value: "en+m3" },
-  { name: "Female 1",              value: "en+f1" },
-  { name: "Female 2",              value: "en+f2" },
-  { name: "Female 3",              value: "en+f3" },
-  { name: "Female 4",              value: "en+f4" },
+  { name: "Default — British (M)",  value: "en-gb"    },
+  { name: "American (M)",           value: "en-us"    },
+  { name: "Male 1",                 value: "en-gb+m1" },
+  { name: "Male 2",                 value: "en-gb+m2" },
+  { name: "Male 3",                 value: "en-gb+m3" },
+  { name: "Female 1",               value: "en-gb+f1" },
+  { name: "Female 2",               value: "en-gb+f2" },
+  { name: "Female 3",               value: "en-gb+f3" },
 ];
 
 export const data = new SlashCommandBuilder()
@@ -281,7 +281,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  const voice = interaction.options.getString("voice") ?? "Brian";
+  const voice = interaction.options.getString("voice") ?? "en-gb";
 
   // Tear down any existing session first
   const existing = sessions.get(interaction.guild.id);
