@@ -2,21 +2,20 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Enable pnpm using corepack (built into Node 20+)
+# Enable pnpm
 RUN corepack enable pnpm
 
-# Copy only lockfile and config files first (for better caching)
+# Copy root config files first
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc* ./
-COPY artifacts/package.json ./artifacts/
+
+# Copy the artifacts folder (this is where your bot lives)
+COPY artifacts ./artifacts
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy the rest of the code
-COPY . .
-
 # Build the project
 RUN pnpm run build
 
-# Start the bot (this matches what we tried earlier)
+# Start the bot
 CMD ["pnpm", "--filter", "./artifacts/**", "start"]
