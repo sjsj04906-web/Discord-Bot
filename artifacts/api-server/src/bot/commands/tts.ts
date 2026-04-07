@@ -404,26 +404,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       try {
         const net = (connection as any).state?.networking;
         const dave = net?.state?.dave;
-        if (dave && typeof dave.encrypt === "function") {
-          let count = 0;
-          const orig = dave.encrypt.bind(dave);
-          dave.encrypt = (packet: Buffer) => {
-            const out = orig(packet);
-            if (count++ < 3) {
-              logger.info({
-                inBytes: packet.length,
-                outBytes: out.length,
-                changed: !packet.equals(out),
-              }, `TTS DAVE encrypt sample #${count}`);
-            }
-            return out;
-          };
-          logger.info("TTS DAVE encrypt diagnostic installed");
+        if (dave) {
+          // Bypass inner DAVE E2EE so only the transport layer (AES-256-GCM) runs.
+          // This tests whether the DAVE layer is causing the decryption failure on
+          // the user's client side.  If audio becomes audible, DAVE is the culprit.
+          dave.encrypt = (packet: Buffer) => packet;
+          logger.info("TTS DAVE encrypt BYPASSED (transport-only test)");
         } else {
-          logger.warn({ hasDave: !!dave }, "TTS DAVE encrypt diagnostic: no encrypt fn");
+          logger.warn("TTS DAVE encrypt bypass: no dave object");
         }
       } catch (e) {
-        logger.warn({ err: (e as Error).message }, "TTS DAVE encrypt diagnostic failed");
+        logger.warn({ err: (e as Error).message }, "TTS DAVE bypass failed");
       }
     });
 
