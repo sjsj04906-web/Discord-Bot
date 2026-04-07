@@ -222,7 +222,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     });
 
     connection.on("debug", (msg) =>
-      logger.debug({ voiceDebug: msg }, "voice internal")
+      logger.info({ voiceDebug: msg }, "voice internal")
     );
 
     // Wait for Ready; log every state transition so we can diagnose hangs
