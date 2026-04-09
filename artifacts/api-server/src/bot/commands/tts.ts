@@ -17,25 +17,18 @@ import {
   getVoiceConnection,
   AudioPlayer,
   VoiceConnection,
-  VoiceUDPSocket,
 } from "@discordjs/voice";
 import { spawn } from "node:child_process";
 import { THEME } from "../theme.js";
 import { logger } from "../../lib/logger.js";
 
 // ── Replit NAT workaround ──────────────────────────────────────────────────────
-// Replit's network forwards outbound UDP but swallows inbound UDP replies, so
-// the standard Discord voice IP-discovery echo never completes.
-// We replace performIPDiscovery with an HTTP-based version: it binds the socket
-// (giving us a real local port for sending RTP later), then fetches the
-// container's public IP via ipify instead of waiting for the unreachable echo.
-// For TTS the bot only needs to SEND audio, so this is sufficient.
+// (unchanged — still needed on Replit)
 (VoiceUDPSocket.prototype as unknown as {
   performIPDiscovery(ssrc: number): Promise<{ ip: string; port: number }>;
 }).performIPDiscovery = async function (
   _ssrc: number
 ): Promise<{ ip: string; port: number }> {
-  // Bind the dgram socket so we own a real ephemeral port.
   let localPort = 0;
   try {
     localPort = (this.socket as import("node:dgram").Socket).address().port;
@@ -51,7 +44,6 @@ import { logger } from "../../lib/logger.js";
     localPort = (this.socket as import("node:dgram").Socket).address().port;
   }
 
-  // Resolve public IP over HTTPS instead of the blocked UDP echo.
   const resp = await fetch("https://api.ipify.org?format=json", {
     signal: AbortSignal.timeout(8_000),
   });
@@ -80,21 +72,16 @@ const sessions = new Map<string, TtsSession>();
 
 function cleanText(message: Message): string {
   return message.content
-    // Resolve user mentions → display name
     .replace(/<@!?(\d+)>/g, (_, id) => {
       const m = message.guild?.members.cache.get(id);
       return m?.displayName ?? "someone";
     })
-    // Resolve channel mentions
     .replace(/<#(\d+)>/g, (_, id) => {
       const ch = message.guild?.channels.cache.get(id);
       return ch ? `#${ch.name}` : "#channel";
     })
-    // Role mentions
     .replace(/<@&\d+>/g, "@role")
-    // Custom emoji → just the name
     .replace(/<a?:(\w+):\d+>/g, "$1")
-    // Collapse URLs to "link"
     .replace(/https?:\/\/\S+/g, "link")
     .trim()
     .slice(0, 200);
@@ -112,7 +99,6 @@ function playNext(session: TtsSession): void {
   logger.info({ text }, "TTS playNext: spawning espeak-ng");
 
   try {
-    // espeak-ng → ffmpeg (OGG Opus) → @discordjs/voice OggOpus path
     const espeak = spawn("espeak-ng", [
       "-v", session.voice,
       "-s", "155",
@@ -137,20 +123,18 @@ function playNext(session: TtsSession): void {
     espeak.stderr.on("data", (d: Buffer) =>
       logger.warn({ stderr: d.toString().trim() }, "TTS espeak-ng stderr")
     );
-    espeak.on("error", (err) => {
-      logger.warn({ err }, "TTS espeak-ng spawn error");
-      playNext(session);
-    });
     ffmpeg.stderr.on("data", (d: Buffer) =>
       logger.warn({ stderr: d.toString().trim() }, "TTS ffmpeg stderr")
     );
-    ffmpeg.on("error", (err) => {
-      logger.warn({ err }, "TTS ffmpeg spawn error");
+
+    espeak.on("error", (err) => {
+      logger.error({ err }, "TTS: espeak-ng failed to start — is it installed?");
       playNext(session);
     });
-    ffmpeg.on("exit", (code) =>
-      logger.info({ code }, "TTS ffmpeg exited")
-    );
+    ffmpeg.on("error", (err) => {
+      logger.error({ err }, "TTS ffmpeg spawn error");
+      playNext(session);
+    });
 
     if (!ffmpeg.stdout) {
       logger.warn("TTS ffmpeg: stdout unavailable");
@@ -162,38 +146,9 @@ function playNext(session: TtsSession): void {
       inputType: StreamType.WebmOpus,
     });
 
-    resource.playStream.on("error", (err) =>
-      logger.warn({ err }, "TTS audio stream error")
-    );
-
-    session.player.on("error", (err) =>
-      logger.warn({ err }, "TTS audio player error")
-    );
-    session.player.once(AudioPlayerStatus.Idle, () => {
-      logger.info("TTS player idle → next");
-      playNext(session);
-    });
-
-    // Inspect internal DAVE session state before playing
-    try {
-      const networking = (session.connection as any).state?.networking;
-      const daveWrapper = networking?.state?.dave;
-      const daveSession = daveWrapper?.session;
-      logger.info({
-        connectionStatus: session.connection.state.status,
-        daveProtocol: daveWrapper?.protocolVersion,
-        daveSessionReady: daveSession?.ready,
-        daveSessionStatus: daveSession?.status,
-        daveEpoch: daveSession?.epoch?.toString() ?? null,
-      }, "TTS DAVE state pre-play");
-    } catch (e) {
-      logger.warn({ err: (e as Error).message }, "TTS DAVE inspect error");
-    }
-
-    logger.info({ playerStatus: session.player.state.status }, "TTS calling player.play()");
     session.player.play(resource);
   } catch (err) {
-    logger.warn({ err }, "TTS playNext error");
+    logger.error({ err }, "TTS playNext error");
     playNext(session);
   }
 }
@@ -204,7 +159,7 @@ function enqueueText(guildId: string, text: string): void {
   session.queue.push(text);
   if (!session.playing) {
     session.playing = true;
-    void playNext(session);
+    playNext(session);
   }
 }
 
@@ -216,18 +171,12 @@ export function handleTtsMessage(message: Message): void {
   const session = sessions.get(message.guild.id);
   if (!session) return;
 
-  if (message.channelId !== session.textChannelId) {
-    logger.info(
-      { msgChannel: message.channelId, ttsChannel: session.textChannelId },
-      "TTS: message in wrong channel, ignoring"
-    );
-    return;
-  }
+  if (message.channelId !== session.textChannelId) return;
 
   const text = cleanText(message);
-  logger.info({ text, queueLen: session.queue.length, playing: session.playing }, "TTS: enqueuing message");
   if (!text) return;
 
+  logger.info({ text, queueLen: session.queue.length }, "TTS: enqueuing message");
   enqueueText(message.guild.id, text);
 }
 
@@ -254,7 +203,7 @@ export const data = new SlashCommandBuilder()
       .addStringOption((o) =>
         o
           .setName("voice")
-          .setDescription("TTS voice to use (default: Brian)")
+          .setDescription("TTS voice to use")
           .setRequired(false)
           .addChoices(...VOICES)
       )
@@ -280,11 +229,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     if (!conn && !hadSession) {
       await interaction.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(THEME.danger)
-            .setDescription("❌ Not currently in TTS mode."),
-        ],
+        embeds: [new EmbedBuilder().setColor(THEME.danger).setDescription("❌ Not currently in TTS mode.")],
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -294,11 +239,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     conn?.destroy();
 
     await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(THEME.success)
-          .setDescription("📴 TTS mode stopped."),
-      ],
+      embeds: [new EmbedBuilder().setColor(THEME.success).setDescription("📴 TTS mode stopped.")],
     });
     return;
   }
@@ -309,11 +250,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   if (!voiceChannel) {
     await interaction.reply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(THEME.danger)
-          .setDescription("❌ Join a voice channel first, then use `/tts join`."),
-      ],
+      embeds: [new EmbedBuilder().setColor(THEME.danger).setDescription("❌ Join a voice channel first.")],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -321,30 +258,20 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const voice = interaction.options.getString("voice") ?? "en-gb";
 
-  // ── Permission sanity check ──────────────────────────────────────────────────
+  // Permission check
   const botMember = interaction.guild.members.me;
   if (botMember) {
     const perms = voiceChannel.permissionsFor(botMember);
-    const canConnect = perms?.has(PermissionsBitField.Flags.Connect) ?? false;
-    const canSpeak   = perms?.has(PermissionsBitField.Flags.Speak)   ?? false;
-    logger.info({ canConnect, canSpeak, channelId: voiceChannel.id }, "TTS permission check");
-    if (!canSpeak) {
+    if (!perms?.has(PermissionsBitField.Flags.Speak)) {
       await interaction.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(THEME.danger)
-            .setDescription(
-              `❌ GL1TCH is missing the **Speak** permission in **${voiceChannel.name}**.\n` +
-              `Grant it in Server Settings → Roles or Channel Permissions, then try again.`
-            ),
-        ],
+        embeds: [new EmbedBuilder().setColor(THEME.danger).setDescription(`❌ Missing **Speak** permission in **${voiceChannel.name}**.`)],
         flags: MessageFlags.Ephemeral,
       });
       return;
     }
   }
 
-  // Tear down any existing session first
+  // Clean up old session
   const existing = sessions.get(interaction.guild.id);
   if (existing) {
     existing.connection.destroy();
@@ -360,88 +287,38 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       adapterCreator: interaction.guild.voiceAdapterCreator,
       selfDeaf: false,
       debug: true,
+      // DAVE is enabled by default with @discordjs/voice + @snazzah/davey
+      // This is the compliant way — no manual bypass
     });
 
-    connection.on("debug", (dbgMsg: string) => {
-      logger.info({ dbgMsg }, "VoiceConn debug");
-    });
-
-    // Wait up to 15 s for Ready state
-    await new Promise<void>((resolve, reject) => {
-      let lastStatus = connection.state.status;
-      let settled = false;
-
-      const settle = (err?: Error) => {
-        if (settled) return;
-        settled = true;
-        connection.off("stateChange", onState);
-        clearTimeout(timer);
-        err ? reject(err) : resolve();
-      };
-
-      const onState = (_: unknown, next: { status: VoiceConnectionStatus }) => {
-        lastStatus = next.status;
-        if (next.status === VoiceConnectionStatus.Ready) settle();
-        else if (next.status === VoiceConnectionStatus.Destroyed)
-          settle(new Error("Voice connection was destroyed before it became ready."));
-      };
-
-      if (connection.state.status === VoiceConnectionStatus.Ready) {
-        settle();
-        return;
-      }
-
-      connection.on("stateChange", onState);
-      const timer = setTimeout(
-        () => settle(new Error("Timed out connecting to the voice channel.")),
-        15_000
-      );
-    });
-
-    // ── DAVE encrypt diagnostic (first 3 packets only) ───────────────────────────
-    // Applied after "transitioned" (DAVE epoch 1 active) so session.ready is true
-    connection.once("transitioned", () => {
-      try {
-        const net = (connection as any).state?.networking;
-        const dave = net?.state?.dave;
-        if (dave) {
-          // Bypass inner DAVE E2EE so only the transport layer (AES-256-GCM) runs.
-          // This tests whether the DAVE layer is causing the decryption failure on
-          // the user's client side.  If audio becomes audible, DAVE is the culprit.
-          dave.encrypt = (packet: Buffer) => packet;
-          logger.info("TTS DAVE encrypt BYPASSED (transport-only test)");
-        } else {
-          logger.warn("TTS DAVE encrypt bypass: no dave object");
-        }
-      } catch (e) {
-        logger.warn({ err: (e as Error).message }, "TTS DAVE bypass failed");
-      }
-    });
-
-    // ── DAVE transition-0 fix ────────────────────────────────────────────────────
-    // @discordjs/voice skips DaveTransitionReady (op 23) for the initial
-    // transition id=0, but Discord won't forward Speaking events to channel
-    // members until it receives this ack.  Send it manually once "transitioned"
-    // fires for id 0.
+    // Common compatibility patch many bots still need
     connection.on("transitioned", (transitionId: number) => {
       logger.info({ transitionId }, "TTS voice connection transitioned");
       if (transitionId === 0) {
         try {
           const net = (connection as any).state?.networking;
-          const ws  = net?.state?.ws;
-          if (ws && typeof ws.sendPacket === "function") {
+          const ws = net?.state?.ws;
+          if (ws?.sendPacket) {
             ws.sendPacket({ op: 23, d: { transition_id: 0 } });
-            logger.info("TTS: sent DaveTransitionReady(0) — missing from @discordjs/voice");
-          } else {
-            logger.warn("TTS: ws.sendPacket unavailable, skipping DaveTransitionReady(0)");
+            logger.info("TTS: sent DaveTransitionReady(0)");
           }
         } catch (e) {
-          logger.warn({ err: (e as Error).message }, "TTS: DaveTransitionReady(0) patch error");
+          logger.warn({ err: (e as Error).message }, "DaveTransitionReady(0) patch failed");
         }
       }
     });
 
     const player = createAudioPlayer();
+
+    // Attach Idle listener once (prevents duplicates)
+    player.on(AudioPlayerStatus.Idle, () => {
+      logger.info("TTS player idle → next");
+      const session = sessions.get(interaction.guild!.id);
+      if (session) playNext(session);
+    });
+
+    player.on("error", (err) => logger.warn({ err }, "TTS audio player error"));
+
     connection.subscribe(player);
 
     const session: TtsSession = {
@@ -454,7 +331,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     };
     sessions.set(interaction.guild.id, session);
 
-    // Auto-clean when the voice connection is torn down externally
     connection.once(VoiceConnectionStatus.Destroyed, () => {
       sessions.delete(interaction.guild.id);
     });
@@ -465,7 +341,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           .setColor(THEME.success)
           .setTitle("🔊 TTS Mode Active")
           .setDescription(
-            `Joined **${voiceChannel.name}** and listening in <#${interaction.channelId}>.\n` +
+            `Joined **\( {voiceChannel.name}** and listening in <# \){interaction.channelId}>.\n` +
             `Every message sent here will be read aloud.\n\n` +
             `Use \`/tts stop\` to disconnect.`
           )
@@ -477,11 +353,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     sessions.delete(interaction.guild.id);
     const msg = err instanceof Error ? err.message : "Unknown error";
     await interaction.editReply({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(THEME.danger)
-          .setDescription(`❌ Failed to join voice channel — ${msg}`),
-      ],
+      embeds: [new EmbedBuilder().setColor(THEME.danger).setDescription(`❌ Failed to join voice channel — ${msg}`)],
     });
   }
 }
